@@ -53,20 +53,20 @@ def run_3d(*options,
     #Average GPU Memory: 12591148.05MiB
 
 
-# BIGGER???
 def run_2dplus1(*options, 
     cfg='/home/iliauk/notebooks/hr2d2/configs/cls_hrnet_w18.yaml'):
+
+    # Quiker to run but takes up for GPU vRAM
 
     config.defrost()
     config.merge_from_file(cfg)
 
     model = get_cls_net_2dplus1(config)
-    print(model)
+    #print(model)
     model.cuda()
     model.train()
 
     # Can do a max batch of 2 if 16 frames and 112*112
-    # ???? more params
 
     mem = torch.cuda.max_memory_allocated()
     input = torch.randn((2, 3, 16, 112, 112)).cuda()
@@ -91,8 +91,8 @@ def run_2dplus1(*options,
     print("Number of Parameters : {}".format(count_parameters(model)))
     print("Average Running Time: {}s".format(avg_time/(100)))
     print("Average GPU Memory: {}MiB".format(avg_mem/(100*1024)))
-    #Number of Parameters : 53801753
-    #Average Running Time: 0.1259375762939453s
+    #Number of Parameters : 53801753 == roughly same as 3D
+    #Average Running Time: 0.1259375762939453s  # but batch is smaller x3
     #Average GPU Memory: 11663663.045MiB
 
 
