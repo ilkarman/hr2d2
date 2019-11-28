@@ -1,0 +1,2 @@
+- Maybe this segmentation based model is better suited for [moments-in-time](http://moments.csail.mit.edu/) or [charades](https://allenai.org/plato/charades/); in either case we should train (or pretriain on kinetics first)
+- Maybe to verify we have recreated Kinetics400 we could train the R2+1 model from scratch on it?
