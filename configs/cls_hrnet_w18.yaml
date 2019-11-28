@@ -70,7 +70,6 @@ DATASET:
   ROOT: 'data/kinetics400/'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
-  NUM_CLASSES: 400
 TEST:
   BATCH_SIZE_PER_GPU: 2
   MODEL_FILE: ''
