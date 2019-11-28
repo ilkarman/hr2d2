@@ -325,7 +325,8 @@ class HighResolutionNet(nn.Module):
         self.incre_modules, self.downsamp_modules, \
             self.final_layer = self._make_head(pre_stage_channels)
 
-        self.classifier = nn.Linear(2048, 1000)
+        # Reduce from 1024 to 400 for Kinetics-400
+        self.classifier = nn.Linear(1024, 400)
 
     def _make_head(self, pre_stage_channels):
         head_block = Bottleneck
@@ -359,9 +360,10 @@ class HighResolutionNet(nn.Module):
             downsamp_modules.append(downsamp_module)
         downsamp_modules = nn.ModuleList(downsamp_modules)
 
+        # Reduce from 2048 to 1024 for Kinetics-400
         final_layer = nn.Sequential(
-            conv1x1(head_channels[3] * head_block.expansion, 2048, padding=0, bias=True),
-            BatchNorm(2048, momentum=BN_MOMENTUM),
+            conv1x1(head_channels[3] * head_block.expansion, 1024, padding=0, bias=True),
+            BatchNorm(1024, momentum=BN_MOMENTUM),
             nn.ReLU(inplace=True)
         )
 
@@ -452,9 +454,6 @@ class HighResolutionNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        #x = self.conv2(x)
-        #x = self.bn2(x)
-        #x = self.relu(x)
         x = self.layer1(x)
 
         x_list = []
