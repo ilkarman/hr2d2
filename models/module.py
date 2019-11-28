@@ -1,100 +1,17 @@
-a) BasicBlock
+#https://raw.githubusercontent.com/irhum/R2Plus1D-PyTorch/master/module.py
 
-resnet
+import math
 
-class BasicBlock(nn.Module):
-   
-    def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-        self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
-        self.bn2 = norm_layer(planes)
-        self.downsample = downsample
-        self.stride = stride
+import torch.nn as nn
+from torch.nn.modules.utils import _triple
 
-    def forward(self, x):
-        res = self.relu1(self.bn1(self.conv1(x)))    
-        res = self.bn2(self.conv2(res))
-
-        if self.downsample:
-            x = self.downsamplebn(self.downsampleconv(x))
-
-        return self.outrelu(x + res)
-
-r2+1
-
-class SpatioTemporalResBlock(nn.Module):
-   
-    def __init__(self, in_channels, out_channels, kernel_size, downsample=False):
-    
-        if self.downsample:
-            # downsample with stride =2 the input x
-            self.downsampleconv = SpatioTemporalConv(in_channels, out_channels, 1, stride=2)
-            self.downsamplebn = nn.BatchNorm3d(out_channels)
-
-            # downsample with stride = 2when producing the residual
-            self.conv1 = SpatioTemporalConv(in_channels, out_channels, kernel_size, padding=padding, stride=2)
-        else:
-            self.conv1 = SpatioTemporalConv(in_channels, out_channels, kernel_size, padding=padding)
-
-        self.bn1 = nn.BatchNorm3d(out_channels)
-        self.relu1 = nn.ReLU()
-
-        # standard conv->batchnorm->ReLU
-        self.conv2 = SpatioTemporalConv(out_channels, out_channels, kernel_size, padding=padding)
-        self.bn2 = nn.BatchNorm3d(out_channels)
-        self.outrelu = nn.ReLU()
-
-    def forward(self, x):
-        res = self.relu1(self.bn1(self.conv1(x)))    
-        res = self.bn2(self.conv2(res))
-
-        if self.downsample:
-            x = self.downsamplebn(self.downsampleconv(x))
-
-        return self.outrelu(x + res)
-
-b) Comparison (layers 1,2,3,4)
-
-resnet
-
-self.layer1 = self._make_layer(block, 64, layers[0])
-self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
-self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
-self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
-
-self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-
-r2+1
-
-self.conv2 = SpatioTemporalResLayer(64, 64, 3, layer_sizes[0], block_type=block_type)
-self.conv3 = SpatioTemporalResLayer(64, 128, 3, layer_sizes[1], block_type=block_type, downsample=True)
-self.conv4 = SpatioTemporalResLayer(128, 256, 3, layer_sizes[2], block_type=block_type, downsample=True)
-self.conv5 = SpatioTemporalResLayer(256, 512, 3, layer_sizes[3], block_type=block_type, downsample=True)
-
-self.pool = nn.AdaptiveAvgPool3d(1)
-
-c) Comparison (layer 0)
-
-resnet
-
-self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
-self.bn1 = norm_layer(self.inplanes)
-self.relu = nn.ReLU(inplace=True)
-self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-
-r2+1
-
-self.conv1 = SpatioTemporalConv(3, 64, [3, 7, 7], stride=[1, 2, 2], padding=[1, 3, 3])
-
-***
 
 class SpatioTemporalConv(nn.Module):
     r"""Applies a factored 3D convolution over an input signal composed of several input 
     planes with distinct spatial and time axes, by performing a 2D convolution over the 
     spatial axes to an intermediate subspace, followed by a 1D convolution over the time 
     axis to produce the final output.
+
     Args:
         in_channels (int): Number of channels in the input tensor
         out_channels (int): Number of channels produced by the convolution

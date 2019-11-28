@@ -1,0 +1,2 @@
+https://github.com/irhum/R2Plus1D-PyTorch
+https://github.com/HRNet/HRNet-Image-Classification
