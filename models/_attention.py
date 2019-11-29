@@ -3,14 +3,13 @@ import torch
 
 class SELayerTHW(nn.Module):
     # Excite channels
-    # Altered channel//reduction for 1 when time (max dim=16) is squeeze
-    def __init__(self, channel):
+    def __init__(self, channel, reduction=9):
         super(SELayerTHW, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool3d(1)
         self.fc = nn.Sequential(
-            nn.Linear(channel, 1, bias=False),
+            nn.Linear(channel, channel // reduction, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(1, channel, bias=False),
+            nn.Linear(channel // reduction, channel, bias=False),
             nn.Sigmoid()
         )
 
@@ -22,14 +21,13 @@ class SELayerTHW(nn.Module):
 
 class SELayerCHW(nn.Module):
     # Excite time
-    # Altered reduction to 0 when channels squeeze (min dim=18)
-    def __init__(self, channel, reduction=9):
+    def __init__(self, temporal):
         super(SELayerCHW, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool3d(1)
         self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
+            nn.Linear(temporal, 1, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Linear(1, temporal, bias=False),
             nn.Sigmoid()
         )
 
@@ -42,6 +40,7 @@ class SELayerCHW(nn.Module):
 
 
 if __name__ == '__main__':
+    
     x = torch.randn((2, 18, 16, 112, 112)).cuda()
 
     c3p0 = SELayerTHW(x.size()[1]).cuda()
