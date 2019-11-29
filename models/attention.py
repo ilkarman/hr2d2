@@ -32,9 +32,9 @@ class SELayerCHW(nn.Module):
         )
 
     def forward(self, x):
-        b, c, t, h, w = x.size()
-        # x.view(b,t,c,h,w) or permute? I think view but not sure
-        y = self.avg_pool(x.view(b,t,c,h,w)).view(b, t)
+        b, _, t, _, _ = x.size()
+        # Permute insteda of view
+        y = self.avg_pool(x.permute(0,2,1,3,4)).view(b, t)
         y = self.fc(y).view(b, 1, t, 1, 1)
         return x * y.expand_as(x)
 
