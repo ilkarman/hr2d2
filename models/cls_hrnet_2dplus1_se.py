@@ -355,7 +355,8 @@ class HighResolutionNet(nn.Module):
             self.final_layer = self._make_head(pre_stage_channels)
 
         # Reduce from 1024 to 400 for Kinetics-400
-        self.classifier = nn.Linear(1024, 400)
+        # Reduce from 1024 to 339 for Moments-in-Time
+        self.classifier = nn.Linear(1024, 339)
 
     def _make_head(self, pre_stage_channels):
         head_block = Bottleneck

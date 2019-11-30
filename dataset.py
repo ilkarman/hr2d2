@@ -20,7 +20,7 @@ class VideoDataset(Dataset):
             clip_len (int, optional): Determines how many frames are there in each clip. Defaults to 8. 
         """
 
-    def __init__(self, directory, mode='train', clip_len=8):
+    def __init__(self, directory, mode='train', clip_len=16):
         folder = Path(directory)/mode  # get the directory of the specified split
 
         self.clip_len = clip_len

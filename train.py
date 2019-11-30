@@ -1,52 +1,80 @@
-https://github.com/irhum/R2Plus1D-PyTorch/blob/master/trainer.py
-
 import os
 import time
 
 import numpy as np
 import torch
 from torch import nn, optim
+from torch.utils import data
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset import VideoDataset, VideoDataset1M
-from network import R2Plus1DClassifier
+#from network import R2Plus1DClassifier
+import fire
+from models.cls_hrnet_2dplus1 import get_cls_net
+from default import _C as config
+
 
 # Use GPU if available else revert to CPU
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("Device being used:", device)
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#print("Device being used:", device)
 
-def train_model(num_classes, directory, layer_sizes=[2, 2, 2, 2], num_epochs=45, save=True, path="model_data.pth.tar"):
-    """Initalizes and the model for a fixed number of epochs, using dataloaders from the specified directory, 
-    selected optimizer, scheduler, criterion, defualt otherwise. Features saving and restoration capabilities as well. 
-    Adapted from the PyTorch tutorial found here: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
+def run(directory="/datasets/Moments_in_Time_256x256_30fps",
+        num_epochs=45,
+        path="/datasets/models/model_data.pth.tar",
+        save=True,
+        *options, cfg=None, local_rank=0):
 
-        Args:
-            num_classes (int): Number of classes in the data
+    """Args:
             directory (str): Directory where the data is to be loaded from
-            layer_sizes (list, optional): Number of blocks in each layer. Defaults to [2, 2, 2, 2], equivalent to ResNet18.
             num_epochs (int, optional): Number of epochs to train for. Defaults to 45. 
             save (bool, optional): If true, the model will be saved to path. Defaults to True. 
             path (str, optional): The directory to load a model checkpoint from, and if save == True, save to. Defaults to "model_data.pth.tar".
     """
 
+    config.defrost()
+    config.merge_from_file(cfg)
+    torch.backends.cudnn.benchmark = config.CUDNN.BENCHMARK
 
-    # initalize the ResNet 18 version of this model
-    model = R2Plus1DClassifier(num_classes=num_classes, layer_sizes=layer_sizes).to(device)
+    #Distributed
+    world_size = 1
+    torch.cuda.set_device(local_rank)
+    torch.distributed.init_process_group(backend="nccl", init_method="env://")
 
+    # Dataloaders
+    train_set = VideoDataset(directory, clip_len=16)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        train_set, num_replicas=world_size, rank=local_rank
+    )
+    train_loader = data.DataLoader(
+        train_set, batch_size=2, num_workers=4, sampler=train_sampler,
+    )
+
+    val_set = VideoDataset(directory, mode='val', clip_len=16)
+    val_sampler = torch.utils.data.distributed.DistributedSampler(
+        val_set, num_replicas=world_size, rank=local_rank)
+    val_loader = data.DataLoader(
+        val_set, batch_size=4, num_workers=4, sampler=val_sampler,
+    )
+
+    dataloaders = {'train': train_loader, 'val': val_loader}
+
+    dataset_sizes = {x: len(dataloaders[x].dataset) for x in ['train', 'val']}
+
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        raise Exception("Cannot find GPU")
+
+    model = get_cls_net(config).to(device)
+    #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    model = torch.nn.parallel.DistributedDataParallel(
+        model, device_ids=[device], find_unused_parameters=True)
+
+    
     criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
     optimizer = optim.SGD(model.parameters(), lr=0.01)  # hyperparameters as given in paper sec 4.1
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
-
-    # prepare the dataloaders into a dict
-    train_dataloader = DataLoader(VideoDataset(directory), batch_size=10, shuffle=True, num_workers=4)
-    # IF training on Kinetics-600 and require exactly a million samples each epoch, 
-    # import VideoDataset1M and uncomment the following
-    # train_dataloader = DataLoader(VideoDataset1M(directory), batch_size=32, num_workers=4)
-    val_dataloader = DataLoader(VideoDataset(directory, mode='val'), batch_size=14, num_workers=4)
-    dataloaders = {'train': train_dataloader, 'val': val_dataloader}
-
-    dataset_sizes = {x: len(dataloaders[x].dataset) for x in ['train', 'val']}
 
     # saves the time the process was started, to compute total time at the end
     start = time.time()
@@ -124,3 +152,6 @@ def train_model(num_classes, directory, layer_sizes=[2, 2, 2, 2], num_epochs=45,
     # print the total time needed, HH:MM:SS format
     time_elapsed = time.time() - start    
     print(f"Training complete in {time_elapsed//3600}h {(time_elapsed%3600)//60}m {time_elapsed %60}s")
+
+if __name__ == "__main__":
+    fire.Fire(run)
