@@ -37,24 +37,24 @@ def run(directory="/datasets/Moments_in_Time_256x256_30fps",
     torch.backends.cudnn.benchmark = config.CUDNN.BENCHMARK
 
     #Distributed
-    world_size = 1
+    world_size = 8
     torch.cuda.set_device(local_rank)
     torch.distributed.init_process_group(backend="nccl", init_method="env://")
 
     # Dataloaders
-    train_set = VideoDataset(directory, clip_len=16)
+    train_set = VideoDataset(directory, clip_len=32)
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_set, num_replicas=world_size, rank=local_rank
     )
     train_loader = data.DataLoader(
-        train_set, batch_size=2, num_workers=4, sampler=train_sampler,
+        train_set, batch_size=3, num_workers=4, sampler=train_sampler,
     )
 
-    val_set = VideoDataset(directory, mode='val', clip_len=16)
+    val_set = VideoDataset(directory, mode='val', clip_len=32)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=local_rank)
     val_loader = data.DataLoader(
-        val_set, batch_size=4, num_workers=4, sampler=val_sampler,
+        val_set, batch_size=3, num_workers=4, sampler=val_sampler,
     )
 
     dataloaders = {'train': train_loader, 'val': val_loader}
@@ -67,7 +67,7 @@ def run(directory="/datasets/Moments_in_Time_256x256_30fps",
         raise Exception("Cannot find GPU")
 
     model = get_cls_net(config).to(device)
-    #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model = torch.nn.parallel.DistributedDataParallel(
         model, device_ids=[device], find_unused_parameters=True)
 
@@ -104,8 +104,6 @@ def run(directory="/datasets/Moments_in_Time_256x256_30fps",
             # set model to train() or eval() mode depending on whether it is trained
             # or being validated. Primarily affects layers such as BatchNorm or Dropout.
             if phase == 'train':
-                # scheduler.step() is to be called once every epoch during training
-                scheduler.step()
                 model.train()
             else:
                 model.eval()
@@ -134,6 +132,11 @@ def run(directory="/datasets/Moments_in_Time_256x256_30fps",
 
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+
+            if phase == 'train':
+                # scheduler.step() is to be called once every epoch during training
+                # FLAG should be called after optimizer step?
+                scheduler.step()
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
