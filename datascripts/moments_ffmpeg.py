@@ -12,6 +12,8 @@ PATH = '/datasets/Moments_in_Time_256x256_30fps'
 def process_ffmpeg(in_filename):
     b = in_filename.split("/")
     outf = "/".join(b[:-1]) + '/s150_%s' % b[-1]
+
+    # -an flag should remove audio
     command = ['ffmpeg',
                '-i', '"%s"' % in_filename,
                '-vf scale=150:150 ' \
@@ -26,7 +28,7 @@ def process_ffmpeg(in_filename):
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
-        print(err.output)
+        print(err.output, in_filename)
         return in_filename
 
     return None
