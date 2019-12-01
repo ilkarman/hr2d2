@@ -1,0 +1,50 @@
+import subprocess
+import os
+import json
+import glob
+from joblib import delayed
+from joblib import Parallel
+
+NUM_JOBS = 2
+PATH = '/data/home/iliauk'
+
+def process_ffmpeg(in_filename):
+    b = in_filename.split("/")
+    outf = "/".join(b[:-1]) + '/s150_%s' % b[-1]
+    command = ['ffmpeg',
+               '-i', '"%s"' % in_filename,
+               '-vf scale=150:150 ' \
+               '-r 15 ' \
+               '-c:v', 'libx264',
+               '-threads', '1',
+               '-y ',
+               '-loglevel', 'panic',
+               '"%s"' % outf]
+    command = ' '.join(command)
+    try:
+        output = subprocess.check_output(command, shell=True,
+                                         stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        return in_filename
+
+    return None
+
+if __name__ == '__main__':
+        
+    input_files = [
+        os.path.join(root, name)
+        for root, dirs, files in os.walk(PATH)
+        for name in files
+        if name.endswith((".mp4")) and not name.startswith(("s150_"))
+    ]
+
+    print("{} Number of files to process".format(len(input_files)))
+
+    error_lst = Parallel(n_jobs=NUM_JOBS)(delayed(process_ffmpeg)(v) for v in input_files)
+    error_lst = [x for x in error_lst if x is not None]
+    print(error_lst)
+
+
+
+
