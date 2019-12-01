@@ -2,11 +2,12 @@ import subprocess
 import os
 import json
 import glob
+import time
 from joblib import delayed
 from joblib import Parallel
 
-NUM_JOBS = 2
-PATH = '/data/home/iliauk'
+NUM_JOBS = 40
+PATH = '/datasets/Moments_in_Time_256x256_30fps'
 
 def process_ffmpeg(in_filename):
     b = in_filename.split("/")
@@ -15,7 +16,7 @@ def process_ffmpeg(in_filename):
                '-i', '"%s"' % in_filename,
                '-vf scale=150:150 ' \
                '-r 15 ' \
-               '-c:v', 'libx264',
+               '-c:v', 'libx264', '-c:a', 'copy',
                '-threads', '1',
                '-y ',
                '-loglevel', 'panic',
@@ -40,9 +41,13 @@ if __name__ == '__main__':
     ]
 
     print("{} Number of files to process".format(len(input_files)))
+    start = time.time()
 
     error_lst = Parallel(n_jobs=NUM_JOBS)(delayed(process_ffmpeg)(v) for v in input_files)
     error_lst = [x for x in error_lst if x is not None]
+
+    print("Finished")
+    print(time.time() - start)
     print(error_lst)
 
 
