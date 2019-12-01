@@ -10,6 +10,7 @@ NUM_JOBS = 40
 PATH = '/datasets/Moments_in_Time_256x256_30fps'
 
 def process_ffmpeg(in_filename):
+    # Splitting by / may break certain files, fix properly
     b = in_filename.split("/")
     outf = "/".join(b[:-1]) + '/s150_%s' % b[-1]
 
@@ -21,6 +22,7 @@ def process_ffmpeg(in_filename):
                '-c:v', 'libx264', '-c:a', 'copy',
                '-threads', '1',
                '-y ',
+               '-an ',
                '-loglevel', 'panic',
                '"%s"' % outf]
     command = ' '.join(command)
