@@ -46,6 +46,7 @@ def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
         in_planes, out_planes, kernel_size=3, stride=stride,
         padding=padding, bias=bias)
 
+# FLAG: experiment with this .. maybe don't use spatiotemporalhere
 def conv1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
     """1x1 convolution with padding"""
     return SpatioTemporalConv(in_planes, out_planes, kernel_size=1, stride=stride,

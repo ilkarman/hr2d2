@@ -33,7 +33,7 @@ MODEL:
       - 36
       FUSE_METHOD: SUM
     STAGE3:
-      NUM_MODULES: 4
+      NUM_MODULES: 1
       NUM_BRANCHES: 3
       BLOCK: BASIC
       NUM_BLOCKS:
@@ -46,7 +46,7 @@ MODEL:
       - 72
       FUSE_METHOD: SUM
     STAGE4:
-      NUM_MODULES: 3
+      NUM_MODULES: 1
       NUM_BRANCHES: 4
       BLOCK: BASIC
       NUM_BLOCKS:

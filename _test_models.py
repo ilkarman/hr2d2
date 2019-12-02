@@ -178,4 +178,4 @@ if __name__ == "__main__":
     #fire.Fire(run_r2plus1d_orig)
     #fire.Fire(run_3d)
     #fire.Fire(run_2dplus1)
-    fire.Fire(run_2dplus1_cse)
+    fire.Fire(run_2dplus1)
