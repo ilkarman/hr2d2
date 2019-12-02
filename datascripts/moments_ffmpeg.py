@@ -18,16 +18,20 @@ def process_ffmpeg(in_filename):
     # -an flag should remove audio
     # original paper uses 340x256 so do half-res for quick iter: 170x128
     # original paper uses 25fps, reduce also to 15 for quick iter
+    # Trying to follow: https://github.com/activitynet/ActivityNet/blob/master/Crawler/Kinetics/download.py#L100
     command = ['ffmpeg',
-               '-i', '"%s"' % in_filename,
-               '-vf "scale=iw*min(170/iw\,128/ih):ih*min(170/iw\,128/ih),pad=170:128:(170-iw)/2:(128-ih)/2" ' \
-               '-r 15 ' \
-               '-threads', '1',
                '-y ',
+               '-i', '"%s"' % in_filename,
+               '-r', '15' ,
+               '-vf "scale=iw*min(170/iw\,128/ih):ih*min(170/iw\,128/ih),pad=170:128:(170-iw)/2:(128-ih)/2" ',
+               '-c:v', 'libx264',
+               '-threads', '1',
                '-an ',
                '-loglevel', 'panic',
                '"%s"' % outf]
     command = ' '.join(command)
+    print(command)
+    STOP
 
     try:
         output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
