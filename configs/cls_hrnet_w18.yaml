@@ -4,6 +4,7 @@ DATA_DIR: ''
 OUTPUT_DIR: 'output/'
 WORKERS: 4
 PRINT_FREQ: 1000
+WORLD_SIZE: 4
 
 
 MODEL: 
@@ -60,19 +61,24 @@ MODEL:
       - 72
       - 144
       FUSE_METHOD: SUM
+
 CUDNN:
   BENCHMARK: true
   DETERMINISTIC: false
   ENABLED: true
+
 DATASET:
   DATASET: 'kinetics400'
   DATA_FORMAT: 'avi'
   ROOT: 'data/kinetics400/'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
+  N_CLASSES: 339
+
 TEST:
   BATCH_SIZE_PER_GPU: 2
   MODEL_FILE: ''
+
 TRAIN:
   BATCH_SIZE_PER_GPU: 2
   BEGIN_EPOCH: 0
@@ -89,5 +95,6 @@ TRAIN:
   MOMENTUM: 0.9
   NESTEROV: true
   SHUFFLE: true
+  
 DEBUG:
   DEBUG: false

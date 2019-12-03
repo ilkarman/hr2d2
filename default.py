@@ -20,6 +20,9 @@ _C.PRINT_FREQ = 20
 _C.AUTO_RESUME = False
 _C.PIN_MEMORY = True
 _C.RANK = 0
+_C.LOG_CONFIG = "logging.conf"
+_C.WORLD_SIZE = 1
+_C.SEED = 42
 
 # Cudnn related params
 _C.CUDNN = CN()
@@ -64,6 +67,7 @@ _C.DATASET.ROT_FACTOR = 30
 _C.DATASET.PROB_HALF_BODY = 0.0
 _C.DATASET.NUM_JOINTS_HALF_BODY = 8
 _C.DATASET.COLOR_RGB = False
+_C.DATASET.N_CLASSES = 2
 
 # train
 _C.TRAIN = CN()
@@ -87,6 +91,7 @@ _C.TRAIN.CHECKPOINT = ''
 
 _C.TRAIN.BATCH_SIZE_PER_GPU = 32
 _C.TRAIN.SHUFFLE = True
+_C.TRAIN.MODEL_DIR = "model"
 
 # testing
 _C.TEST = CN()
@@ -119,24 +124,14 @@ _C.DEBUG.SAVE_HEATMAPS_GT = False
 _C.DEBUG.SAVE_HEATMAPS_PRED = False
 
 
-def update_config(cfg, args):
+def update_config(cfg, options=None, config_file=None):
     cfg.defrost()
-    cfg.merge_from_file(args.cfg)
 
-    if args.modelDir:
-        cfg.OUTPUT_DIR = args.modelDir
+    if config_file:
+        cfg.merge_from_file(config_file)
 
-    if args.logDir:
-        cfg.LOG_DIR = args.logDir
-
-    if args.dataDir:
-        cfg.DATA_DIR = args.dataDir
-
-    if args.testModel:
-        cfg.TEST.MODEL_FILE = args.testModel
-
-    cfg.DATASET.ROOT = os.path.join(
-        cfg.DATA_DIR, cfg.DATASET.DATASET, 'images')
+    if options:
+        cfg.merge_from_list(options)
 
     cfg.freeze()
 
