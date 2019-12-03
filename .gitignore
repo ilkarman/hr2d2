@@ -3,3 +3,6 @@
 *.pyc
 **/*.pyc
 **/*_checkpoints
+
+**/output
+**/outputs
