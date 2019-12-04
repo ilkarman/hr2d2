@@ -42,19 +42,19 @@ def run(directory="/datasets/Moments_in_Time_Small",
     torch.distributed.init_process_group(backend="nccl", init_method="env://")
 
     # Dataloaders
-    train_set = VideoDataset(directory, clip_len=16)
+    train_set = VideoDataset(directory, clip_len=32)
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_set, num_replicas=world_size, rank=local_rank
     )
     train_loader = data.DataLoader(
-        train_set, batch_size=4, num_workers=4, sampler=train_sampler,
+        train_set, batch_size=4, num_workers=3, sampler=train_sampler,
     )
 
-    val_set = VideoDataset(directory, mode='val', clip_len=16)
+    val_set = VideoDataset(directory, mode='val', clip_len=32)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=local_rank)
     val_loader = data.DataLoader(
-        val_set, batch_size=4, num_workers=4, sampler=val_sampler,
+        val_set, batch_size=8, num_workers=3, sampler=val_sampler,
     )
 
     dataloaders = {'train': train_loader, 'val': val_loader}
@@ -133,9 +133,9 @@ def run(directory="/datasets/Moments_in_Time_Small",
 
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
-                samples += world_size
-                if samples % (100*1000) == 0:
-                    print("{} samples processed".format(samples))
+                samples += 1
+                if samples % (10000) == 0:
+                    print("{} samples per GPU processed".format(samples))
 
             if phase == 'train':
                 # scheduler.step() is to be called once every epoch during training

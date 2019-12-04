@@ -42,7 +42,7 @@ class VideoDataset(Dataset):
         self.label2index = {label:index for index, label in enumerate(sorted(set(labels)))} 
         # convert the list of label names into an array of label indices
         self.label_array = np.array([self.label2index[label] for label in labels], dtype=int)    
-        print("Loaded {} files.format".format(len(self.label_array)))    
+        print("Loaded {} files for mode {}".format(len(self.label_array), mode)) 
 
     def __getitem__(self, index):
         # loading and preprocessing. TODO move them to transform classes
@@ -62,7 +62,6 @@ class VideoDataset(Dataset):
         frame_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         # create a buffer. Must have dtype float, so it gets converted to a FloatTensor by Pytorch later
         buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
-        print(fname, frame_count)
         count = 0
         retaining = True
 
@@ -90,7 +89,6 @@ class VideoDataset(Dataset):
     
     def crop(self, buffer, clip_len, crop_size):
         # randomly select time index for temporal jittering
-        print(buffer.shape[1], clip_len)
         time_index = np.random.randint(buffer.shape[1] - clip_len)
         # randomly select start indices in order to crop the video
         #height_index = np.random.randint(buffer.shape[2] - crop_size)
