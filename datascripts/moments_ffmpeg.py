@@ -3,10 +3,11 @@ import os
 import json
 import glob
 import time
+import cv2
 from joblib import delayed
 from joblib import Parallel
 
-NUM_JOBS = 40
+NUM_JOBS = 1
 PATH = '/datasets/Moments_in_Time_Raw'
 PREFIX ='sX_'
 
@@ -30,13 +31,15 @@ def process_ffmpeg(in_filename):
                '-loglevel', 'panic',
                '"%s"' % outf]
     command = ' '.join(command)
-    print(command)
-    STOP
-
     try:
         output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as err:
-        # Seem to lose only 4 files so ignore
+        # Verify output
+        capture = cv2.VideoCapture(outf)
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_count < 32:
+            print("Output", outf, frame_count)
+
+    except Exception as err:
         print(err, in_filename)
         return in_filename
     # Have zip, so remove original
@@ -51,7 +54,6 @@ if __name__ == '__main__':
         for name in files
         if name.endswith((".mp4")) and not name.startswith((PREFIX))
     ]
-
     print("{} Number of files to process".format(len(input_files)))
     start = time.time()
 
