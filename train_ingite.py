@@ -132,21 +132,21 @@ def run(local_process_id, node_rank, dist_url, run_config):
    
     # Dataloaders
     n_classes = run_config.DATASET.N_CLASSES
-    train_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TRAIN_SET, clip_len=16, num_classes=n_classes)
+    train_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TRAIN_SET, clip_len=32, num_classes=n_classes)
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_set, num_replicas=world_size, rank=rank
     )
     train_loader = data.DataLoader(
-        train_set, batch_size=3, num_workers=4, sampler=train_sampler,
+        train_set, batch_size=4, num_workers=4, sampler=train_sampler,
     )
        
     logger.info(f"Training examples {len(train_set)}")
 
-    val_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TEST_SET, clip_len=16, num_classes=n_classes)
+    val_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TEST_SET, clip_len=32, num_classes=n_classes)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=rank)
     val_loader = data.DataLoader(
-        val_set, batch_size=3, num_workers=4, sampler=val_sampler,
+        val_set, batch_size=8, num_workers=4, sampler=val_sampler,
     )
     logger.info(f"Validation examples {len(val_set)}")
 

@@ -3,10 +3,11 @@ import os
 import json
 import glob
 import time
+import cv2
 from joblib import delayed
 from joblib import Parallel
 
-NUM_JOBS = 40
+NUM_JOBS = 1
 PATH = '/datasets/Moments_in_Time_Raw'
 PREFIX ='sX_'
 
@@ -18,21 +19,27 @@ def process_ffmpeg(in_filename):
     # -an flag should remove audio
     # original paper uses 340x256 so do half-res for quick iter: 170x128
     # original paper uses 25fps, reduce also to 15 for quick iter
+    # Trying to follow: https://github.com/activitynet/ActivityNet/blob/master/Crawler/Kinetics/download.py#L100
     command = ['ffmpeg',
-               '-i', '"%s"' % in_filename,
-               '-vf "scale=iw*min(170/iw\,128/ih):ih*min(170/iw\,128/ih),pad=170:128:(170-iw)/2:(128-ih)/2" ' \
-               '-r 15 ' \
-               '-threads', '1',
                '-y ',
+               '-i', '"%s"' % in_filename,
+               '-r', '15' ,
+               '-vf "scale=iw*min(170/iw\,128/ih):ih*min(170/iw\,128/ih),pad=170:128:(170-iw)/2:(128-ih)/2" ',
+               '-c:v', 'libx264',
+               '-threads', '1',
                '-an ',
                '-loglevel', 'panic',
                '"%s"' % outf]
     command = ' '.join(command)
-
     try:
         output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as err:
-        # Seem to lose only 4 files so ignore
+        # Verify output
+        capture = cv2.VideoCapture(outf)
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_count < 32:
+            print("Output", outf, frame_count)
+
+    except Exception as err:
         print(err, in_filename)
         return in_filename
     # Have zip, so remove original
@@ -47,7 +54,6 @@ if __name__ == '__main__':
         for name in files
         if name.endswith((".mp4")) and not name.startswith((PREFIX))
     ]
-
     print("{} Number of files to process".format(len(input_files)))
     start = time.time()
 
@@ -57,7 +63,3 @@ if __name__ == '__main__':
     print("Finished")
     print(time.time() - start)
     print(error_lst)
-
-
-
-

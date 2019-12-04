@@ -29,8 +29,8 @@ class VideoDataset(Dataset):
 
         # the following three parameters are chosen as described in the paper section 4.1
         self.resize_height = 128  
-        self.resize_width = 171
-        self.crop_size = 112
+        self.resize_width = 170
+        self.crop_size = 128
 
         # obtain all the filenames of files inside all the class folders 
         # going through each class folder one at a time
@@ -75,6 +75,7 @@ class VideoDataset(Dataset):
             # NOTE: strongly recommended to resize them during the download process. This script
             # will process videos of any size, but will take longer the larger the video file.
             if (frame_height != self.resize_height) or (frame_width != self.resize_width):
+                print(" Costly resizing {}".format(fname))
                 frame = cv2.resize(frame, (self.resize_width, self.resize_height))
             buffer[count] = frame
             count += 1
@@ -92,7 +93,8 @@ class VideoDataset(Dataset):
         # randomly select time index for temporal jittering
         time_index = np.random.randint(buffer.shape[1] - clip_len)
         # randomly select start indices in order to crop the video
-        height_index = np.random.randint(buffer.shape[2] - crop_size)
+        #height_index = np.random.randint(buffer.shape[2] - crop_size)
+        height_index = 0  # Crop is full-height
         width_index = np.random.randint(buffer.shape[3] - crop_size)
 
         # crop and jitter the video using indexing. The spatial crop is performed on 

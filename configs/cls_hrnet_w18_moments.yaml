@@ -10,8 +10,8 @@ WORLD_SIZE: 8
 MODEL: 
   NAME: 3d_cls_hrnet_w18
   IMAGE_SIZE: 
-    - 112
-    - 112
+    - 128
+    - 128
   EXTRA:
     STAGE1:
       NUM_MODULES: 1
@@ -70,17 +70,17 @@ CUDNN:
 DATASET:
   DATASET: 'moments'
   DATA_FORMAT: 'avi'
-  ROOT: '/data/moments/Moments_in_Time_Small'
-  TEST_SET: 'validation'
-  TRAIN_SET: 'training'
+  ROOT: '/datasets/Moments_in_Time_Small'
+  TEST_SET: 'val'
+  TRAIN_SET: 'train'
   N_CLASSES: 339
 
 TEST:
-  BATCH_SIZE_PER_GPU: 2
+  BATCH_SIZE_PER_GPU: 8
   MODEL_FILE: ''
 
 TRAIN:
-  BATCH_SIZE_PER_GPU: 2
+  BATCH_SIZE_PER_GPU: 4
   BEGIN_EPOCH: 0
   END_EPOCH: 100
   RESUME: true
