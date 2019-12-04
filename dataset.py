@@ -164,7 +164,7 @@ class VideoFakeData(VisionDataset):
 
     """
 
-    def __init__(self, *args, size=1000, image_size=(3,16,128,128), num_classes=2, 
+    def __init__(self, *args, size=64000, image_size=(3,32,128,128), num_classes=339, 
                  transform=None, target_transform=None, random_offset=0, **kwargs):
         super(VideoFakeData, self).__init__(None, transform=transform,
                                        target_transform=target_transform)
