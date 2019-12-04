@@ -22,7 +22,7 @@ class VideoDataset(Dataset):
             clip_len (int, optional): Determines how many frames are there in each clip. Defaults to 8. 
         """
 
-    def __init__(self, directory, mode='train', clip_len=16):
+    def __init__(self, directory, mode='train', clip_len=16, **kwargs):
         folder = Path(directory)/mode  # get the directory of the specified split
 
         self.clip_len = clip_len
@@ -125,7 +125,7 @@ class VideoDataset1M(VideoDataset):
             mode (str, optional): Determines which folder of the directory the dataset will read from. Defaults to 'train'. 
             clip_len (int, optional): Determines how many frames are there in each clip. Defaults to 8. 
         """
-    def __init__(self, directory, mode='train', clip_len=8):
+    def __init__(self, directory, mode='train', clip_len=8, **kwargs):
         # Initialize instance of original dataset class
         super(VideoDataset1M, self).__init__(directory, mode, clip_len)
 
@@ -148,13 +148,6 @@ class VideoDataset1M(VideoDataset):
         return 1000000  # manually set the length to 1 million
 
 
-# class VideoFakeData(FakeData):
-#     """ N,3,16,128,128 input and N,1 output
-#     """
-#     def __init__(self, size=1000, image_size=(3,16,128,128), num_classes=2, transform=None, target_transform=None, random_offset=0):
-#         super().__init__(size=size, image_size=image_size, num_classes=num_classes, transform=transform, target_transform=target_transform, random_offset=random_offset)
-
-
 class VideoFakeData(VisionDataset):
     """A fake dataset that returns randomly generated images and returns them as PIL images
 
@@ -171,8 +164,8 @@ class VideoFakeData(VisionDataset):
 
     """
 
-    def __init__(self, size=1000, image_size=(3,16,128,128), num_classes=2, 
-                 transform=None, target_transform=None, random_offset=0):
+    def __init__(self, *args, size=1000, image_size=(3,16,128,128), num_classes=2, 
+                 transform=None, target_transform=None, random_offset=0, **kwargs):
         super(VideoFakeData, self).__init__(None, transform=transform,
                                        target_transform=target_transform)
         self.size = size
@@ -206,3 +199,13 @@ class VideoFakeData(VisionDataset):
 
     def __len__(self):
         return self.size
+
+
+_DATASETS = {
+    "fake":VideoFakeData,
+    "moments":VideoDataset,
+} 
+
+def get_dataset(dataset):
+    return _DATASETS[dataset]
+

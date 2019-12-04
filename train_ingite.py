@@ -1,4 +1,8 @@
 """Trains models using PyTorch DistributedDataParallel
+
+To run with 8 GPUs:
+MASTER_ADDR="127.0.0.1" MASTER_PORT=29500 python train_ingite.py  0 WORKERS 4 GPUS 0,1,2,3,4,5,6,7 WORLD_SIZE 8 --cfg configs/cls_hrnet_w18_moments.yaml
+
 """
 
 import logging
@@ -41,7 +45,7 @@ from toolz import compose, curry
 from torch.utils import data
 from models.cls_hrnet_2dplus1 import get_cls_net
 from ignite.contrib.handlers.param_scheduler import LRScheduler
-from dataset import VideoDataset, VideoDataset1M, VideoFakeData
+from dataset import get_dataset
 import torch.multiprocessing as mp
 from cv_lib.event_handlers.logging_handlers import Evaluator
 from cv_lib.event_handlers.tensorboard_handlers import create_summary_writer
@@ -77,11 +81,10 @@ def main(node_rank, *options, dist_url="env://", cfg=None):
                                       default.py
         cfg (str, optional): Location of config file to load. Defaults to None.
     """
-
     update_config(config, options=options, config_file=cfg)
-
      # Start logging
     load_log_configuration(config.LOG_CONFIG)
+    print(__name__)
     logger = logging.getLogger(__name__)
     logger.debug(config.WORKERS)
 
@@ -97,6 +100,7 @@ def main(node_rank, *options, dist_url="env://", cfg=None):
 
 def run(local_process_id, node_rank, dist_url, run_config):
     dist_backend="nccl"
+    load_log_configuration(run_config.LOG_CONFIG)
     logger = logging.getLogger(__name__)
     silence_other_ranks = True
     world_size = int(run_config.WORLD_SIZE)
@@ -118,17 +122,17 @@ def run(local_process_id, node_rank, dist_url, run_config):
             rank=rank,
         )
 
-    torch.backends.cudnn.benchmark = config.CUDNN.BENCHMARK
+    torch.backends.cudnn.benchmark = run_config.CUDNN.BENCHMARK
 
-    torch.manual_seed(config.SEED)
+    torch.manual_seed(run_config.SEED)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(config.SEED)
-    np.random.seed(seed=config.SEED)
+        torch.cuda.manual_seed_all(run_config.SEED)
+    np.random.seed(seed=run_config.SEED)
     # Setup Augmentations
    
     # Dataloaders
-    n_classes = config.DATASET.N_CLASSES
-    train_set = VideoFakeData(num_classes=n_classes)
+    n_classes = run_config.DATASET.N_CLASSES
+    train_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TRAIN_SET, clip_len=16, num_classes=n_classes)
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_set, num_replicas=world_size, rank=rank
     )
@@ -138,7 +142,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
        
     logger.info(f"Training examples {len(train_set)}")
 
-    val_set = VideoFakeData(num_classes=n_classes)
+    val_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TEST_SET, clip_len=16, num_classes=n_classes)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=rank)
     val_loader = data.DataLoader(
@@ -153,7 +157,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
     else:
         logger.warning("Can not find GPUs!!!")
 
-    model = get_cls_net(config).to(device)
+    model = get_cls_net(run_config).to(device)
 
     if distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -162,8 +166,8 @@ def run(local_process_id, node_rank, dist_url, run_config):
 
     # Loss and Schedule
     criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
-    optimizer = optim.SGD(model.parameters(), lr=config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
-    step_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=config.TRAIN.LR_FACTOR)  # the scheduler divides the lr by 10 every 10 epochs
+    optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
+    step_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=run_config.TRAIN.LR_FACTOR)  # the scheduler divides the lr by 10 every 10 epochs
     scheduler = LRScheduler(step_scheduler)
 
     # Setting up trainer
@@ -192,19 +196,18 @@ def run(local_process_id, node_rank, dist_url, run_config):
 
     # Set the validation run to start on the epoch completion of the training run
     trainer.add_event_handler(Events.EPOCH_COMPLETED, Evaluator(evaluator, val_loader))
-
     if rank == 0:  # Run only on master process
 
         trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, logging_handlers.log_training_output(log_interval=config.PRINT_FREQ),
+            Events.ITERATION_COMPLETED, logging_handlers.log_training_output(log_interval=run_config.PRINT_FREQ),
         )
         trainer.add_event_handler(Events.EPOCH_STARTED, logging_handlers.log_lr(optimizer))
 
-        output_dir = generate_path(config.OUTPUT_DIR, git_branch(), git_hash(), config.MODEL.NAME, current_datetime(),)
+        output_dir = generate_path(run_config.OUTPUT_DIR, git_branch(), git_hash(), run_config.MODEL.NAME, current_datetime(),)
 
-        summary_writer = create_summary_writer(log_dir=path.join(output_dir, config.LOG_DIR))
+        summary_writer = create_summary_writer(log_dir=path.join(output_dir, run_config.LOG_DIR))
 
-        logger.info(f"Logging Tensorboard to {path.join(output_dir, config.LOG_DIR)}")
+        logger.info(f"Logging Tensorboard to {path.join(output_dir, run_config.LOG_DIR)}")
         
         trainer.add_event_handler(
             Events.EPOCH_STARTED, tensorboard_handlers.log_lr(summary_writer, optimizer, "epoch"),
@@ -233,15 +236,15 @@ def run(local_process_id, node_rank, dist_url, run_config):
         )
 
         checkpoint_handler = SnapshotHandler(
-            path.join(output_dir, config.TRAIN.MODEL_DIR),
-            config.MODEL.NAME,
+            path.join(output_dir, run_config.TRAIN.MODEL_DIR),
+            run_config.MODEL.NAME,
             extract_metric_from("loss"),
         )
         evaluator.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {"model": model})
 
         logger.info("Starting training")
 
-    trainer.run(train_loader, max_epochs=config.TRAIN.END_EPOCH)
+    trainer.run(train_loader, max_epochs=run_config.TRAIN.END_EPOCH)
 
 
 if __name__ == "__main__":
