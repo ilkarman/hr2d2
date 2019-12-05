@@ -73,7 +73,7 @@ DATASET:
   ROOT: '/datasets/Moments_in_Time_Small'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
-  N_CLASSES: 339
+  N_CLASSES: 39
 
 TEST:
   BATCH_SIZE_PER_GPU: 8
