@@ -7,9 +7,9 @@ import cv2
 from joblib import delayed
 from joblib import Parallel
 
-NUM_JOBS = 1
+NUM_JOBS = 8
 PATH = '/datasets/Moments_in_Time_Raw'
-PREFIX ='sX_'
+PREFIX ='mX_'
 
 def process_ffmpeg(in_filename):
     # Splitting by / may break certain files, fix properly
@@ -24,26 +24,33 @@ def process_ffmpeg(in_filename):
                '-y ',
                '-i', '"%s"' % in_filename,
                '-r', '15' ,
-               '-vf "scale=iw*min(170/iw\,128/ih):ih*min(170/iw\,128/ih),pad=170:128:(170-iw)/2:(128-ih)/2" ',
+               '-vf "scale=iw*min(340/iw\,256/ih):ih*min(340/iw\,256/ih),pad=340:256:(170-iw)/2:(256-ih)/2" ',
                '-c:v', 'libx264',
                '-threads', '1',
                '-an ',
                '-loglevel', 'panic',
                '"%s"' % outf]
     command = ' '.join(command)
-    try:
-        output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-        # Verify output
-        capture = cv2.VideoCapture(outf)
-        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        if frame_count < 32:
-            print("Output", outf, frame_count)
+    success = 0
+    attempts = 0
+    while (success==0) and (attempts <= 10):
+      try:
+          attempts += 1
+          output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+          # Verify output
+          frame_count = int(cv2.VideoCapture(outf).get(cv2.CAP_PROP_FRAME_COUNT))
+          if frame_count < 32:
+              print("Error with output: ", outf, frame_count)
+          else:
+            success = 1 
+            if attempts > 1:
+              print("Fixed: ", outf)
+  
+      except Exception as err:
+          print(err, in_filename)
 
-    except Exception as err:
-        print(err, in_filename)
-        return in_filename
     # Have zip, so remove original
-    os.remove(in_filename)
+    #os.remove(in_filename)
     return None
 
 if __name__ == '__main__':
