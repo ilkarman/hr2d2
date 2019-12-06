@@ -264,7 +264,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
 
         # FLAG: Videos need some pre-processing maybe?
         # Also would be good to visualise label and predicted label
-        
+
         #evaluator.add_event_handler(
         #    Events.EPOCH_COMPLETED,
         #    tensorboard_handlers.create_video_writer(

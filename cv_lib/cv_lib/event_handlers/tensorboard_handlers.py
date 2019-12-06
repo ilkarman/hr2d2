@@ -5,6 +5,7 @@ from toolz import curry
 import torchvision
 import logging
 import logging.config
+import cv2  # For video logging
 
 try:
     from tensorboardX import SummaryWriter
@@ -73,9 +74,10 @@ def create_video_writer(summary_writer, label, output_variable, normalize=False,
 
     def write_to(engine):
         try:
-            data_tensor = transform_func(engine.state.output[output_variable])
-            # Normalised
-            data_tensor = (data_tensor*128) + 128
+            data_tensor = transform_func(engine.state.output[output_variable])    
+            # Needs to be N, T, C, H, W       
+            data_tensor = data_tensor.permute(0, 2, 1, 3, 4)
+            # Need to swap 
             summary_writer.add_video(label, data_tensor, engine.state.epoch, fps=15)
         except KeyError:
             logger.warning("Unable to visualise Video")
