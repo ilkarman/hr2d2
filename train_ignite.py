@@ -152,7 +152,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
     )
        
     logger.info(f"Training examples {len(train_set)}")
-    logger.info(f"Train shape: {run_config.TRAIN.DATA_SHAPE}")
+    logger.info(f"Train shape: {run_config.TRAIN.CROP_SIZE}")
 
     val_set = get_dataset(run_config.DATASET.DATASET)(
         run_config.DATASET.ROOT,
@@ -171,7 +171,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
     )
 
     logger.info(f"Validation examples {len(val_set)}")
-    logger.info(f"Validation shape: {run_config.TEST.DATA_SHAPE}")
+    logger.info(f"Validation shape: {run_config.TEST.CROP_SIZE}")
 
     # Model
     device = "cpu"

@@ -93,6 +93,7 @@ TRAIN:
   LR: 0.03
   LR_STEP_SIZE: 15
   LR_FACTOR: 0.5
+  MODEL_DIR: "model"
   
 DEBUG:
   DEBUG: false
