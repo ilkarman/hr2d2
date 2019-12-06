@@ -262,6 +262,18 @@ def run(local_process_id, node_rank, dist_url, run_config):
             ),
         )
 
+        # FLAG: Videos need some pre-processing maybe?
+        # Also would be good to visualise label and predicted label
+        
+        #evaluator.add_event_handler(
+        #    Events.EPOCH_COMPLETED,
+        #    tensorboard_handlers.create_video_writer(
+        #        summary_writer, 
+        #        "Validation/Videos",
+        #        "batch"
+        #    ),
+        #)
+
         checkpoint_handler = SnapshotHandler(
             path.join(output_dir, run_config.TRAIN.MODEL_DIR),
             run_config.MODEL.NAME,

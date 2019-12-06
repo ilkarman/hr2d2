@@ -67,3 +67,17 @@ def create_image_writer(summary_writer, label, output_variable, normalize=False,
             logger.warning("Predictions and or ground truth labels not available to report")
 
     return write_to
+
+def create_video_writer(summary_writer, label, output_variable, normalize=False, transform_func=lambda x: x):
+    logger = logging.getLogger(__name__)
+
+    def write_to(engine):
+        try:
+            data_tensor = transform_func(engine.state.output[output_variable])
+            # Normalised
+            data_tensor = (data_tensor*128) + 128
+            summary_writer.add_video(label, data_tensor, engine.state.epoch, fps=15)
+        except KeyError:
+            logger.warning("Unable to visualise Video")
+
+    return write_to

@@ -75,7 +75,7 @@ class VideoDataset(Dataset):
             # NOTE: strongly recommended to resize them during the download process. This script
             # will process videos of any size, but will take longer the larger the video file.
             if (frame_height != self.resize_height) or (frame_width != self.resize_width):
-                print(" NOTE: Costly resizing {}, CHECK".format(fname))
+                print("NOTE: Costly resizing {}, CHECK".format(fname))
                 frame = cv2.resize(frame, (self.resize_width, self.resize_height))
             buffer[count] = frame
             count += 1

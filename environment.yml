@@ -32,3 +32,4 @@ dependencies:
     - pylint
     - scipy
     - jupytext
+    - moviepy  # To visualise videos
