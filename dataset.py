@@ -22,23 +22,24 @@ class VideoDataset(Dataset):
             clip_len (int, optional): Determines how many frames are there in each clip. Defaults to 8. 
         """
 
-    def __init__(self, directory, mode='train', clip_len=16, **kwargs):
+    def __init__(self, directory, mode='train', clip_len=32, 
+                resize_h_w=(128,170), crop_size=128, **kwargs):
         folder = Path(directory)/mode  # get the directory of the specified split
 
         self.clip_len = clip_len
-
-        # the following three parameters are chosen as described in the paper section 4.1
-        self.resize_height = 128  
-        self.resize_width = 170
-        self.crop_size = 128
+        self.resize_height, self.resize_width = resize_h_w  
+        self.crop_size = crop_size
 
         # obtain all the filenames of files inside all the class folders 
         # going through each class folder one at a time
         self.fnames, labels = [], []
         for label in sorted(os.listdir(folder)):
             for fname in os.listdir(os.path.join(folder, label)):
-                self.fnames.append(os.path.join(folder, label, fname))
-                labels.append(label)     
+                if fname.endswith('.mp4'):
+                    self.fnames.append(os.path.join(folder, label, fname))
+                    labels.append(label)    
+                else:
+                    print("Found {} but not video format, skipping".format(fname)) 
 
         # prepare a mapping between the label names (strings) and indices (ints)
         self.label2index = {label:index for index, label in enumerate(sorted(set(labels)))} 
@@ -50,7 +51,6 @@ class VideoDataset(Dataset):
         buffer = self.loadvideo(self.fnames[index])
         buffer = self.crop(buffer, self.clip_len, self.crop_size)
         buffer = self.normalize(buffer)
-
         return buffer, self.label_array[index]    
         
         
@@ -75,7 +75,7 @@ class VideoDataset(Dataset):
             # NOTE: strongly recommended to resize them during the download process. This script
             # will process videos of any size, but will take longer the larger the video file.
             if (frame_height != self.resize_height) or (frame_width != self.resize_width):
-                print(" Costly resizing {}".format(fname))
+                print(" NOTE: Costly resizing {}, CHECK".format(fname))
                 frame = cv2.resize(frame, (self.resize_width, self.resize_height))
             buffer[count] = frame
             count += 1
@@ -90,19 +90,22 @@ class VideoDataset(Dataset):
         return buffer 
     
     def crop(self, buffer, clip_len, crop_size):
+        # Need to add 1 to .randint() if l==h
         # randomly select time index for temporal jittering
-        time_index = np.random.randint(buffer.shape[1] - clip_len)
+        time_index = np.random.randint(buffer.shape[1] - clip_len + 1)
         # randomly select start indices in order to crop the video
-        #height_index = np.random.randint(buffer.shape[2] - crop_size)
-        height_index = 0  # Crop is full-height
-        width_index = np.random.randint(buffer.shape[3] - crop_size)
+        height_index = np.random.randint(buffer.shape[2] - crop_size + 1)
+        width_index = np.random.randint(buffer.shape[3] - crop_size) + 1
 
         # crop and jitter the video using indexing. The spatial crop is performed on 
         # the entire array, so each frame is cropped in the same location. The temporal
         # jitter takes place via the selection of consecutive frames
-        buffer = buffer[:, time_index:time_index + clip_len,
-                        height_index:height_index + crop_size,
-                        width_index:width_index + crop_size]
+        buffer = buffer[
+            :,
+            time_index:time_index + clip_len,
+            height_index:height_index + crop_size,
+            width_index:width_index + crop_size
+        ]
 
         return buffer                
 

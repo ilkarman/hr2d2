@@ -1,7 +1,7 @@
 """Trains models using PyTorch DistributedDataParallel
 
 To run with 8 GPUs:
-MASTER_ADDR="127.0.0.1" MASTER_PORT=29500 python train_ingite.py  0 WORKERS 4 GPUS 0,1,2,3,4,5,6,7 WORLD_SIZE 8 --cfg configs/cls_hrnet_w18_moments.yaml
+MASTER_ADDR="127.0.0.1" MASTER_PORT=29500 python train_ignite.py  0 WORKERS 4 GPUS 0,1,2,3,4,5,6,7 WORLD_SIZE 8 --cfg configs/cls_hrnet_w18_moments.yaml
 
 """
 
@@ -129,26 +129,49 @@ def run(local_process_id, node_rank, dist_url, run_config):
         torch.cuda.manual_seed_all(run_config.SEED)
     np.random.seed(seed=run_config.SEED)
     # Setup Augmentations
+    # dataset.py performs random crop; maybe add random flip
    
     # Dataloaders
     n_classes = run_config.DATASET.N_CLASSES
-    train_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TRAIN_SET, clip_len=32, num_classes=n_classes)
+
+    train_set = get_dataset(run_config.DATASET.DATASET)(
+        run_config.DATASET.ROOT,
+        mode=run_config.DATASET.TRAIN_SET,
+        clip_len=run_config.TRAIN.CLIP_LEN,  # 32
+        resize_h_w=run_config.TRAIN.RESIZE_H_W,  # (128,170)
+        crop_size=run_config.TRAIN.CROP_SIZE,  # 128
+        num_classes=n_classes)
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_set, num_replicas=world_size, rank=rank
     )
     train_loader = data.DataLoader(
-        train_set, batch_size=4, num_workers=4, sampler=train_sampler,
+        train_set, 
+        batch_size=run_config.TRAIN.BATCH_SIZE_PER_GPU, 
+        num_workers=run_config.TRAIN.NUM_WORKERS, 
+        sampler=train_sampler,
     )
        
     logger.info(f"Training examples {len(train_set)}")
+    logger.info(f"Train shape: {run_config.TRAIN.DATA_SHAPE}")
 
-    val_set = get_dataset(run_config.DATASET.DATASET)(run_config.DATASET.ROOT, mode=run_config.DATASET.TEST_SET, clip_len=32, num_classes=n_classes)
+    val_set = get_dataset(run_config.DATASET.DATASET)(
+        run_config.DATASET.ROOT,
+        mode=run_config.DATASET.TEST_SET,
+        clip_len=run_config.TEST.CLIP_LEN,  # 32
+        resize_h_w=run_config.TEST.RESIZE_H_W,  # (128,170)
+        crop_size=run_config.TEST.CROP_SIZE,  # 128
+        num_classes=n_classes)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=rank)
     val_loader = data.DataLoader(
-        val_set, batch_size=8, num_workers=4, sampler=val_sampler,
+        val_set,
+        batch_size=run_config.TEST.BATCH_SIZE_PER_GPU,
+        num_workers=run_config.TEST.NUM_WORKERS, 
+        sampler=val_sampler,
     )
+
     logger.info(f"Validation examples {len(val_set)}")
+    logger.info(f"Validation shape: {run_config.TEST.DATA_SHAPE}")
 
     # Model
     device = "cpu"
@@ -168,7 +191,10 @@ def run(local_process_id, node_rank, dist_url, run_config):
     criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
     optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
     step_scheduler = optim.lr_scheduler.StepLR(
-        optimizer, step_size=run_config.TRAIN.LR_STEP_SIZE, gamma=run_config.TRAIN.LR_FACTOR)  # the scheduler divides the lr by 10 every 10 epochs
+        optimizer, 
+        step_size=run_config.TRAIN.LR_STEP_SIZE, 
+        gamma=run_config.TRAIN.LR_FACTOR  # the scheduler divides the lr by 10 every 10 epochs
+    )  
     scheduler = LRScheduler(step_scheduler)
 
     # Setting up trainer
