@@ -84,13 +84,10 @@ TRAIN:
   BEGIN_EPOCH: 0
   END_EPOCH: 100
   RESUME: true
-  LR_FACTOR: 0.1
-  LR_STEP:
-  - 30
-  - 60
-  - 90
+  LR_FACTOR: 0.5
+  LR_STEP_SIZE: 15
   OPTIMIZER: sgd
-  LR: 0.05
+  LR: 0.03
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
