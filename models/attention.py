@@ -3,6 +3,7 @@ import torch
 
 class SELayerTHW(nn.Module):
     # Excite channels
+    # With reduction 9 smallest bottleneck is 18/9 =2
     def __init__(self, channel, reduction=9):
         super(SELayerTHW, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool3d(1)
@@ -21,13 +22,14 @@ class SELayerTHW(nn.Module):
 
 class SELayerCHW(nn.Module):
     # Excite time
-    def __init__(self, temporal):
+    # With reduction of 2 smallest botteneck is 2/2 = 1
+    def __init__(self, temporal, reduction=2):
         super(SELayerCHW, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool3d(1)
         self.fc = nn.Sequential(
-            nn.Linear(temporal, 1, bias=False),
+            nn.Linear(temporal, temporal // reduction, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(1, temporal, bias=False),
+            nn.Linear(temporal // reduction, temporal, bias=False),
             nn.Sigmoid()
         )
 

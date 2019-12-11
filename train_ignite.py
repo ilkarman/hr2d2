@@ -189,7 +189,9 @@ def run(local_process_id, node_rank, dist_url, run_config):
 
     # Loss and Schedule
     criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
-    optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
+    # FLAG TEMP
+    #optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
+    optimizer = optim.Adam(model.parameters())
     step_scheduler = optim.lr_scheduler.StepLR(
         optimizer, 
         step_size=run_config.TRAIN.LR_STEP_SIZE, 
@@ -200,7 +202,8 @@ def run(local_process_id, node_rank, dist_url, run_config):
     # Setting up trainer
     trainer = create_supervised_trainer(model, optimizer, criterion, prepare_batch, device=device)
 
-    trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
+    # FLAG TEMP
+    #trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
     # Set to update the epoch parameter of our distributed data sampler so that we get
     # different shuffles
     trainer.add_event_handler(Events.EPOCH_STARTED, update_sampler_epoch(train_loader))

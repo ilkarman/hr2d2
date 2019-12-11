@@ -24,6 +24,7 @@ import torch._utils
 import torch.nn.functional as F
 
 from models.module import SpatioTemporalConv
+from models.attention import SELayerCHW, SELayerTHW
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
@@ -57,13 +58,23 @@ def conv1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, se=None, se_temporal=None):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = BatchNorm(planes, momentum=BN_MOMENTUM)
+        # cSE
+        if se:
+            print("Adding SE to BasicBlock. Planes {}, Temporal {}".format(
+                planes, se_temporal
+            ))
+            self.c_att = SELayerTHW(planes, reduction=9)
+            self.t_att = SELayerCHW(se_temporal, reduction=2)
+        else:
+            self.c_att = se
+            self.t_att = se
         self.downsample = downsample
         self.stride = stride
 
@@ -76,6 +87,11 @@ class BasicBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
+        # SE
+        if self.c_att and self.t_att:
+            c_out = self.c_att(out)
+            t_out = self.t_att(out)
+            out = c_out + t_out
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -89,7 +105,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, se=None, se_temporal=None):
         super(Bottleneck, self).__init__()
         self.conv1 = conv1x1(inplanes, planes, padding=0)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
@@ -98,6 +114,16 @@ class Bottleneck(nn.Module):
         self.conv3 = conv1x1(planes, planes * self.expansion, padding=0)
         self.bn3 = BatchNorm(planes * self.expansion, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
+        # cSE
+        if se:
+            print("Adding SE to Bottleneck. Planes {}, Temporal {}".format(
+                planes, se_temporal
+            ))
+            self.c_att = SELayerTHW(planes * self.expansion, reduction=9)
+            self.t_att = SELayerCHW(se_temporal, reduction=2)
+        else:
+            self.c_att = se
+            self.t_att = se
         self.downsample = downsample
         self.stride = stride
 
@@ -114,6 +140,11 @@ class Bottleneck(nn.Module):
 
         out = self.conv3(out)
         out = self.bn3(out)
+        # SE
+        if self.c_att and self.t_att:
+            c_out = self.c_att(out)
+            t_out = self.t_att(out)
+            out = c_out + t_out
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -126,7 +157,7 @@ class Bottleneck(nn.Module):
 
 class HighResolutionModule(nn.Module):
     def __init__(self, num_branches, blocks, num_blocks, num_inchannels,
-                 num_channels, fuse_method, multi_scale_output=True):
+                 num_channels, num_t_channels, fuse_method, multi_scale_output=True):
         super(HighResolutionModule, self).__init__()
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels)
@@ -134,11 +165,12 @@ class HighResolutionModule(nn.Module):
         self.num_inchannels = num_inchannels
         self.fuse_method = fuse_method
         self.num_branches = num_branches
+        self.num_t_channels = num_t_channels
 
         self.multi_scale_output = multi_scale_output
 
         self.branches = self._make_branches(
-            num_branches, blocks, num_blocks, num_channels)
+            num_branches, blocks, num_blocks, num_channels, num_t_channels)
         self.fuse_layers = self._make_fuse_layers()
         self.relu = nn.ReLU(False)
 
@@ -162,7 +194,7 @@ class HighResolutionModule(nn.Module):
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-    def _make_one_branch(self, branch_index, block, num_blocks, num_channels,
+    def _make_one_branch(self, branch_index, block, num_blocks, num_channels, num_t_channels,
                          stride=1):
         downsample = None
         if stride != 1 or \
@@ -181,17 +213,22 @@ class HighResolutionModule(nn.Module):
         self.num_inchannels[branch_index] = \
             num_channels[branch_index] * block.expansion
         for i in range(1, num_blocks[branch_index]):
+            # Add SE if last block
+            add_se = (i==(num_blocks[branch_index])-1)
+            #add_se = False
             layers.append(block(self.num_inchannels[branch_index],
-                                num_channels[branch_index]))
+                                num_channels[branch_index], 
+                                se=add_se,
+                                se_temporal=num_t_channels[branch_index]))
 
         return nn.Sequential(*layers)
 
-    def _make_branches(self, num_branches, block, num_blocks, num_channels):
+    def _make_branches(self, num_branches, block, num_blocks, num_channels, num_t_channels):
         branches = []
 
         for i in range(num_branches):
             branches.append(
-                self._make_one_branch(i, block, num_blocks, num_channels))
+                self._make_one_branch(i, block, num_blocks, num_channels, num_t_channels))
 
         return nn.ModuleList(branches)
 
@@ -287,9 +324,10 @@ class HighResolutionNet(nn.Module):
         # Stage 1
         self.stage1_cfg = cfg['MODEL']['EXTRA']['STAGE1']
         num_channels = self.stage1_cfg['NUM_CHANNELS'][0]
+        num_t_channels = self.stage1_cfg['TEMPORAL_C'][0]
         block = blocks_dict[self.stage1_cfg['BLOCK']]
         num_blocks = self.stage1_cfg['NUM_BLOCKS'][0]
-        self.layer1 = self._make_layer(block, 64, num_channels, num_blocks)
+        self.layer1 = self._make_layer(block, 64, num_channels, num_blocks, num_t_channels)
         stage1_out_channel = block.expansion*num_channels
 
         # Stage 2
@@ -303,7 +341,7 @@ class HighResolutionNet(nn.Module):
         self.stage2, pre_stage_channels = self._make_stage(
             self.stage2_cfg, num_channels)
 
-        # Stgae 3
+        # Stage 3
         self.stage3_cfg = cfg['MODEL']['EXTRA']['STAGE3']
         num_channels = self.stage3_cfg['NUM_CHANNELS']
         block = blocks_dict[self.stage3_cfg['BLOCK']]
@@ -408,7 +446,7 @@ class HighResolutionNet(nn.Module):
 
         return nn.ModuleList(transition_layers)
 
-    def _make_layer(self, block, inplanes, planes, blocks, stride=1):
+    def _make_layer(self, block, inplanes, planes, blocks, num_t_channels=None, stride=1):
         downsample = None
         if stride != 1 or inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -421,7 +459,10 @@ class HighResolutionNet(nn.Module):
         layers.append(block(inplanes, planes, stride, downsample))
         inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(inplanes, planes))
+            # Add SE if last block
+            add_se = (i==(blocks-1))
+            #add_se = False
+            layers.append(block(inplanes, planes, se=add_se, se_temporal=num_t_channels))
 
         return nn.Sequential(*layers)
 
@@ -433,6 +474,8 @@ class HighResolutionNet(nn.Module):
         num_channels = layer_config['NUM_CHANNELS']
         block = blocks_dict[layer_config['BLOCK']]
         fuse_method = layer_config['FUSE_METHOD']
+        num_t_channels = layer_config['TEMPORAL_C']
+
 
         modules = []
         for i in range(num_modules):
@@ -448,6 +491,7 @@ class HighResolutionNet(nn.Module):
                                       num_blocks,
                                       num_inchannels,
                                       num_channels,
+                                      num_t_channels,
                                       fuse_method,
                                       reset_multi_scale_output)
             )
