@@ -23,7 +23,7 @@ import torch.nn as nn
 import torch._utils
 import torch.nn.functional as F
 
-from models.module import SpatioTemporalConv
+from models.module import SpatioTemporalConv, SepSpatioTemporalConv
 from models.attention import SELayerCHW, SELayerTHW
 
 BN_MOMENTUM = 0.1
@@ -43,7 +43,7 @@ BatchNorm = nn.BatchNorm3d
 
 def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
-    return SpatioTemporalConv(
+    return SepSpatioTemporalConv(
         in_planes, out_planes, kernel_size=3, stride=stride,
         padding=padding, bias=bias)
 
