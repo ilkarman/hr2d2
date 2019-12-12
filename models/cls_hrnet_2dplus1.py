@@ -40,20 +40,19 @@ BatchNorm = nn.BatchNorm3d
 # bias=True, padding_mode='zeros')
 
 # Note that default is bias=True; in hrnet only head takes bias
-
+# Only blocks take block_conv3x3
 def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
     return nn.Conv3d(
         in_planes, out_planes, kernel_size=3, stride=stride,
         padding=padding, bias=bias)
 
-def s_conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
+def block_conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
     return SepSpatioTemporalConv(
         in_planes, out_planes, kernel_size=3, stride=stride,
         padding=padding, bias=bias)
 
-# FLAG: experiment with this .. maybe don't use spatiotemporalhere
 def conv1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
     """1x1 convolution with padding"""
     return nn.Conv3d(
@@ -65,10 +64,10 @@ class BasicBlock(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, se=None, se_temporal=None):
         super(BasicBlock, self).__init__()
-        self.conv1 = s_conv3x3(inplanes, planes, stride)
+        self.conv1 = block_conv3x3(inplanes, planes, stride)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = s_conv3x3(planes, planes)
+        self.conv2 = block_conv3x3(planes, planes)
         self.bn2 = BatchNorm(planes, momentum=BN_MOMENTUM)
         # cSE
         if se:
@@ -108,7 +107,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = conv1x1(inplanes, planes, padding=0)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
-        self.conv2 = s_conv3x3(planes, planes, stride=stride)
+        self.conv2 = block_conv3x3(planes, planes, stride=stride)
         self.bn2 = BatchNorm(planes, momentum=BN_MOMENTUM)
         self.conv3 = conv1x1(planes, planes * self.expansion, padding=0)
         self.bn3 = BatchNorm(planes * self.expansion, momentum=BN_MOMENTUM)
