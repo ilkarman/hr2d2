@@ -43,6 +43,12 @@ BatchNorm = nn.BatchNorm3d
 
 def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
+    return nn.Conv3d(
+        in_planes, out_planes, kernel_size=3, stride=stride,
+        padding=padding, bias=bias)
+
+def s_conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
+    """3x3 convolution with padding"""
     return SepSpatioTemporalConv(
         in_planes, out_planes, kernel_size=3, stride=stride,
         padding=padding, bias=bias)
@@ -54,27 +60,22 @@ def conv1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
         in_planes, out_planes, kernel_size=1, stride=stride,
         padding=padding, bias=bias)
 
-
 class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, se=None, se_temporal=None):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.conv1 = s_conv3x3(inplanes, planes, stride)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = s_conv3x3(planes, planes)
         self.bn2 = BatchNorm(planes, momentum=BN_MOMENTUM)
         # cSE
         if se:
-            print("Adding SE to BasicBlock. Planes {}, Temporal {}".format(
-                planes, se_temporal
-            ))
+            print("Adding SE to BasicBlock. Planes {}".format(planes))
             self.c_att = SELayerTHW(planes, reduction=9)
-            #self.t_att = SELayerCHW(se_temporal, reduction=2)
         else:
             self.c_att = se
-            #self.t_att = se
         self.downsample = downsample
         self.stride = stride
 
@@ -87,11 +88,7 @@ class BasicBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
-        # SE
-        #if self.c_att and self.t_att:
-        #    c_out = self.c_att(out)
-        #    t_out = self.t_att(out)
-        #    out = c_out + t_out
+
         if self.c_att:
             out = self.c_att(out)
 
@@ -111,21 +108,17 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = conv1x1(inplanes, planes, padding=0)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
-        self.conv2 = conv3x3(planes, planes, stride=stride)
+        self.conv2 = s_conv3x3(planes, planes, stride=stride)
         self.bn2 = BatchNorm(planes, momentum=BN_MOMENTUM)
         self.conv3 = conv1x1(planes, planes * self.expansion, padding=0)
         self.bn3 = BatchNorm(planes * self.expansion, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         # cSE
         if se:
-            print("Adding SE to Bottleneck. Planes {}, Temporal {}".format(
-                planes, se_temporal
-            ))
+            print("Adding SE to Bottleneck. Planes {}".format(planes))
             self.c_att = SELayerTHW(planes * self.expansion, reduction=9)
-            #self.t_att = SELayerCHW(se_temporal, reduction=2)
         else:
             self.c_att = se
-            #self.t_att = se
         self.downsample = downsample
         self.stride = stride
 
@@ -142,11 +135,7 @@ class Bottleneck(nn.Module):
 
         out = self.conv3(out)
         out = self.bn3(out)
-        # SE
-        #if self.c_att and self.t_att:
-        #    c_out = self.c_att(out)
-        #    t_out = self.t_att(out)
-        #    out = c_out + t_out
+
         if self.c_att:
             out = self.c_att(out)
 
@@ -220,7 +209,6 @@ class HighResolutionModule(nn.Module):
             # Add SE if last block
             #add_se = (i==(num_blocks[branch_index])-1)
             add_se = False
-            #add_se = False
             layers.append(block(self.num_inchannels[branch_index],
                                 num_channels[branch_index], 
                                 se=add_se,
@@ -467,8 +455,7 @@ class HighResolutionNet(nn.Module):
             # Add SE if last block
             #add_se = (i==(blocks-1))
             add_se = False
-            #add_se = False
-            layers.append(block(inplanes, planes, se=add_se, se_temporal=num_t_channels))
+            layers.append(block(inplanes, planes, se=add_se))
 
         return nn.Sequential(*layers)
 

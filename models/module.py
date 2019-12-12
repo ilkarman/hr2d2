@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.nn.modules.utils import _triple
 from models.attention import SELayerCHW, SELayerTHW
 
-class SepSpatioTemporalConv(nn.module):
+class SepSpatioTemporalConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
         super(SepSpatioTemporalConv, self).__init__()
 
@@ -28,9 +28,8 @@ class SepSpatioTemporalConv(nn.module):
         temporal_padding =  [padding[0], 0, 0]
 
         # Conv1 is channel-preserving + project to required dimensions
-        self.conv1 = nn.Covn3d(
-            in_channels, out_channels, (1,1,1), 
-            stride=stride, padding=padding, bias=bias)
+        self.conv1 = nn.Conv3d(
+            in_channels, out_channels, kernel_size=1, stride=stride, padding=[0,0,0], bias=bias)
         # Applying spatial and then temporal, I think forces same spatial filter across time
         # Depthwise seems
         # Spatial conv is applied depth-wise
