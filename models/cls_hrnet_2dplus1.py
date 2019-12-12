@@ -71,10 +71,10 @@ class BasicBlock(nn.Module):
                 planes, se_temporal
             ))
             self.c_att = SELayerTHW(planes, reduction=9)
-            self.t_att = SELayerCHW(se_temporal, reduction=2)
+            #self.t_att = SELayerCHW(se_temporal, reduction=2)
         else:
             self.c_att = se
-            self.t_att = se
+            #self.t_att = se
         self.downsample = downsample
         self.stride = stride
 
@@ -88,10 +88,12 @@ class BasicBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
         # SE
-        if self.c_att and self.t_att:
-            c_out = self.c_att(out)
-            t_out = self.t_att(out)
-            out = c_out + t_out
+        #if self.c_att and self.t_att:
+        #    c_out = self.c_att(out)
+        #    t_out = self.t_att(out)
+        #    out = c_out + t_out
+        if self.c_att:
+            out = self.c_att(out)
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -120,10 +122,10 @@ class Bottleneck(nn.Module):
                 planes, se_temporal
             ))
             self.c_att = SELayerTHW(planes * self.expansion, reduction=9)
-            self.t_att = SELayerCHW(se_temporal, reduction=2)
+            #self.t_att = SELayerCHW(se_temporal, reduction=2)
         else:
             self.c_att = se
-            self.t_att = se
+            #self.t_att = se
         self.downsample = downsample
         self.stride = stride
 
@@ -141,10 +143,12 @@ class Bottleneck(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
         # SE
-        if self.c_att and self.t_att:
-            c_out = self.c_att(out)
-            t_out = self.t_att(out)
-            out = c_out + t_out
+        #if self.c_att and self.t_att:
+        #    c_out = self.c_att(out)
+        #    t_out = self.t_att(out)
+        #    out = c_out + t_out
+        if self.c_att:
+            out = self.c_att(out)
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -214,7 +218,8 @@ class HighResolutionModule(nn.Module):
             num_channels[branch_index] * block.expansion
         for i in range(1, num_blocks[branch_index]):
             # Add SE if last block
-            add_se = (i==(num_blocks[branch_index])-1)
+            #add_se = (i==(num_blocks[branch_index])-1)
+            add_se = False
             #add_se = False
             layers.append(block(self.num_inchannels[branch_index],
                                 num_channels[branch_index], 
@@ -460,7 +465,8 @@ class HighResolutionNet(nn.Module):
         inplanes = planes * block.expansion
         for i in range(1, blocks):
             # Add SE if last block
-            add_se = (i==(blocks-1))
+            #add_se = (i==(blocks-1))
+            add_se = False
             #add_se = False
             layers.append(block(inplanes, planes, se=add_se, se_temporal=num_t_channels))
 

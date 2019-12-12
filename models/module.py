@@ -4,6 +4,7 @@ import math
 
 import torch.nn as nn
 from torch.nn.modules.utils import _triple
+from models.attention import SELayerCHW, SELayerTHW
 
 
 class SpatioTemporalConv(nn.Module):
@@ -51,6 +52,8 @@ class SpatioTemporalConv(nn.Module):
         self.spatial_conv = nn.Conv3d(in_channels, intermed_channels, spatial_kernel_size,
                                     stride=spatial_stride, padding=spatial_padding, bias=bias)
         self.bn = nn.BatchNorm3d(intermed_channels)
+        self.c_att = SELayerTHW(intermed_channels, reduction=9)
+
         self.relu = nn.ReLU()
 
         # the temporal conv is effectively a 1D conv, but has batch norm 
@@ -62,6 +65,6 @@ class SpatioTemporalConv(nn.Module):
                                     stride=temporal_stride, padding=temporal_padding, bias=bias)
 
     def forward(self, x):
-        x = self.relu(self.bn(self.spatial_conv(x)))
+        x = self.relu(self.c_att(self.bn(self.spatial_conv(x))))
         x = self.temporal_conv(x)
         return x
