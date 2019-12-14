@@ -160,20 +160,20 @@ def run(local_process_id, node_rank, dist_url, run_config):
     model = get_cls_net(run_config).to(device)
 
     if distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[device], find_unused_parameters=True)
 
     # Loss and Schedule
     criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
     optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
-    step_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=run_config.TRAIN.LR_FACTOR)  # the scheduler divides the lr by 10 every 10 epochs
+    step_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=run_config.TRAIN.LR_FACTOR)  # the scheduler divides the lr by 10 every 15 epochs
     scheduler = LRScheduler(step_scheduler)
 
     # Setting up trainer
     trainer = create_supervised_trainer(model, optimizer, criterion, prepare_batch, device=device)
 
-    trainer.add_event_handler(Events.ITERATION_STARTED, scheduler)
+    trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
     # Set to update the epoch parameter of our distributed data sampler so that we get
     # different shuffles
     trainer.add_event_handler(Events.EPOCH_STARTED, update_sampler_epoch(train_loader))

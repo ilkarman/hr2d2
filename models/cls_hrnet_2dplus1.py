@@ -330,7 +330,7 @@ class HighResolutionNet(nn.Module):
 
         # Reduce from 1024 to 400 for Kinetics-400
         # Reduce to 339 for kinetics
-        self.classifier = nn.Linear(1024, 339)
+        self.classifier = nn.Linear(1024, cfg['DATASET']['N_CLASSES'])
 
     def _make_head(self, pre_stage_channels):
         head_block = Bottleneck
