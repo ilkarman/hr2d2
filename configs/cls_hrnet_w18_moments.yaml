@@ -22,7 +22,7 @@ MODEL:
       - 16
       FUSE_METHOD: SUM
     STAGE2:
-      NUM_MODULES: 1
+      NUM_MODULES: 4
       NUM_BRANCHES: 2
       BLOCK: BASIC
       NUM_BLOCKS:
@@ -36,7 +36,7 @@ MODEL:
       - 8
       FUSE_METHOD: SUM
     STAGE3:
-      NUM_MODULES: 1
+      NUM_MODULES: 3
       NUM_BRANCHES: 3
       BLOCK: BASIC
       NUM_BLOCKS:
@@ -88,6 +88,7 @@ DATASET:
 
 TEST:
   MODEL_FILE: ''
+  MODEL_PATH: ''
   BATCH_SIZE_PER_GPU: 8
   NUM_WORKERS: 4
   CLIP_LEN: 32

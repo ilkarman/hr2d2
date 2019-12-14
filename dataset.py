@@ -29,6 +29,7 @@ class VideoDataset(Dataset):
         self.clip_len = clip_len
         self.resize_height, self.resize_width = resize_h_w  
         self.crop_size = crop_size
+        self.crop_spatial = True  # Fix, for validation
 
         # obtain all the filenames of files inside all the class folders 
         # going through each class folder one at a time
@@ -94,19 +95,20 @@ class VideoDataset(Dataset):
         # randomly select time index for temporal jittering
         time_index = np.random.randint(buffer.shape[1] - clip_len + 1)
         # randomly select start indices in order to crop the video
-        height_index = np.random.randint(buffer.shape[2] - crop_size + 1)
-        width_index = np.random.randint(buffer.shape[3] - crop_size + 1)
-
         # crop and jitter the video using indexing. The spatial crop is performed on 
         # the entire array, so each frame is cropped in the same location. The temporal
         # jitter takes place via the selection of consecutive frames
-        buffer = buffer[
-            :,
-            time_index:time_index + clip_len,
-            height_index:height_index + crop_size,
-            width_index:width_index + crop_size
-        ]
-
+        if self.crop_spatial:
+            height_index = np.random.randint(buffer.shape[2] - crop_size + 1)
+            width_index = np.random.randint(buffer.shape[3] - crop_size + 1)
+            buffer = buffer[
+                :,
+                time_index:time_index + clip_len,
+                height_index:height_index + crop_size,
+                width_index:width_index + crop_size
+            ]
+        else:
+            buffer = buffer[:,time_index:time_index + clip_len,:,:]
         return buffer                
 
     def normalize(self, buffer):

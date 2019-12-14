@@ -49,9 +49,10 @@ def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
 
 def block_conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
-    return SepSpatioTemporalConv(
+    return nn.Conv3d(
+    #return SepSpatioTemporalConv(
         in_planes, out_planes, kernel_size=3, stride=stride,
-        padding=padding, bias=bias)
+        padding=padding, groups=in_planes, bias=bias)
 
 def conv1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
     """1x1 convolution with padding"""
@@ -206,8 +207,8 @@ class HighResolutionModule(nn.Module):
             num_channels[branch_index] * block.expansion
         for i in range(1, num_blocks[branch_index]):
             # Add SE if last block
-            #add_se = (i==(num_blocks[branch_index])-1)
-            add_se = False
+            add_se = (i==(num_blocks[branch_index])-1)
+            #add_se = False
             layers.append(block(self.num_inchannels[branch_index],
                                 num_channels[branch_index], 
                                 se=add_se,
@@ -452,8 +453,8 @@ class HighResolutionNet(nn.Module):
         inplanes = planes * block.expansion
         for i in range(1, blocks):
             # Add SE if last block
-            #add_se = (i==(blocks-1))
-            add_se = False
+            add_se = (i==(blocks-1))
+            #add_se = False
             layers.append(block(inplanes, planes, se=add_se))
 
         return nn.Sequential(*layers)

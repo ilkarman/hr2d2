@@ -128,39 +128,17 @@ def run(local_process_id, node_rank, dist_url, run_config):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(run_config.SEED)
     np.random.seed(seed=run_config.SEED)
-    # Setup Augmentations
-    # dataset.py performs random crop; maybe add random flip
    
     # Dataloaders
     n_classes = run_config.DATASET.N_CLASSES
-
-    train_set = get_dataset(run_config.DATASET.DATASET)(
-        run_config.DATASET.ROOT,
-        mode=run_config.DATASET.TRAIN_SET,
-        clip_len=run_config.TRAIN.CLIP_LEN,  # 32
-        resize_h_w=run_config.TRAIN.RESIZE_H_W,  # (128,170)
-        crop_size=run_config.TRAIN.CROP_SIZE,  # 128
-        num_classes=n_classes)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(
-        train_set, num_replicas=world_size, rank=rank
-    )
-    train_loader = data.DataLoader(
-        train_set, 
-        batch_size=run_config.TRAIN.BATCH_SIZE_PER_GPU, 
-        num_workers=run_config.TRAIN.NUM_WORKERS, 
-        sampler=train_sampler,
-    )
-       
-    logger.info(f"Training examples {len(train_set)}")
-    logger.info(f"Train shape: {run_config.TRAIN.CROP_SIZE}")
 
     val_set = get_dataset(run_config.DATASET.DATASET)(
         run_config.DATASET.ROOT,
         mode=run_config.DATASET.TEST_SET,
         clip_len=run_config.TEST.CLIP_LEN,  # 32
         resize_h_w=run_config.TEST.RESIZE_H_W,  # (128,170)
-        num_classes=n_classes
-    )
+        crop_size=run_config.TEST.CROP_SIZE,  # 128
+        num_classes=n_classes)
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=rank)
     val_loader = data.DataLoader(
@@ -180,33 +158,18 @@ def run(local_process_id, node_rank, dist_url, run_config):
     else:
         logger.warning("Can not find GPUs!!!")
 
-    model = get_cls_net(run_config).to(device)
+    print('NOT LOADING MODEL PROPERLY FROM IGNITE SNAPSHOT?')
+    STOP
+
+    # Load model from file
+    model = get_cls_net(run_config)
+    model.load_state_dict(torch.load(run_config.TEST.MODEL_PATH))
+    model = model.to(device)
 
     if distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[device], find_unused_parameters=True)
-
-    # Loss and Schedule
-    criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
-    # FLAG TEMP
-    #optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
-    optimizer = optim.Adam(model.parameters())
-    step_scheduler = optim.lr_scheduler.StepLR(
-        optimizer, 
-        step_size=run_config.TRAIN.LR_STEP_SIZE, 
-        gamma=run_config.TRAIN.LR_FACTOR  # the scheduler divides the lr by 10 every 10 epochs
-    )  
-    scheduler = LRScheduler(step_scheduler)
-
-    # Setting up trainer
-    trainer = create_supervised_trainer(model, optimizer, criterion, prepare_batch, device=device)
-
-    # FLAG TEMP
-    #trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
-    # Set to update the epoch parameter of our distributed data sampler so that we get
-    # different shuffles
-    trainer.add_event_handler(Events.EPOCH_STARTED, update_sampler_epoch(train_loader))
 
     if silence_other_ranks & rank != 0:
         logging.getLogger("ignite.engine.engine.Engine").setLevel(logging.WARNING)
@@ -218,76 +181,21 @@ def run(local_process_id, node_rank, dist_url, run_config):
         model,
         prepare_batch,
         metrics={
-            "loss": Loss(criterion, output_transform=_select_pred_and_label, device=device),
             "acc": Accuracy(output_transform=_select_pred_and_label, device=device),
         },
         device=device,
     )
-
-    # Set the validation run to start on the epoch completion of the training run
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, Evaluator(evaluator, val_loader))
-    if rank == 0:  # Run only on master process
-
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, logging_handlers.log_training_output(log_interval=run_config.PRINT_FREQ),
-        )
-        trainer.add_event_handler(Events.EPOCH_STARTED, logging_handlers.log_lr(optimizer))
-
-        output_dir = generate_path(run_config.OUTPUT_DIR, git_branch(), git_hash(), run_config.MODEL.NAME, current_datetime(),)
-
-        summary_writer = create_summary_writer(log_dir=path.join(output_dir, run_config.LOG_DIR))
-
-        logger.info(f"Logging Tensorboard to {path.join(output_dir, run_config.LOG_DIR)}")
-        
-        trainer.add_event_handler(
-            Events.EPOCH_STARTED, tensorboard_handlers.log_lr(summary_writer, optimizer, "epoch"),
-        )
-        trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, tensorboard_handlers.log_training_output(summary_writer),
-        )
-        evaluator.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            logging_handlers.log_metrics(
-                "Validation results",
-                metrics_dict={
-                    "loss": "Avg loss :",
-                    "acc": " Avg Accuracy :",
-                },
-            ),
-        )
-        evaluator.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            tensorboard_handlers.log_metrics(
-                summary_writer,
-                trainer,
-                "epoch",
-                metrics_dict={"loss": "Validation/Loss", "acc": "Validation/Acc",},
-            ),
-        )
-
-        # FLAG: Videos need some pre-processing maybe?
-        # Also would be good to visualise label and predicted label
-
-        #evaluator.add_event_handler(
-        #    Events.EPOCH_COMPLETED,
-        #    tensorboard_handlers.create_video_writer(
-        #        summary_writer, 
-        #        "Validation/Videos",
-        #        "batch"
-        #    ),
-        #)
-
-        checkpoint_handler = SnapshotHandler(
-            path.join(output_dir, run_config.TRAIN.MODEL_DIR),
-            run_config.MODEL.NAME,
-            extract_metric_from("loss"),
-        )
-        evaluator.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {"model": model})
-
-        logger.info("Starting training")
-
-    trainer.run(train_loader, max_epochs=run_config.TRAIN.END_EPOCH)
-
+    
+    evaluator.add_event_handler(
+        Events.EPOCH_COMPLETED,
+        logging_handlers.log_metrics(
+            "Validation results",
+            metrics_dict={
+                "acc": " Avg Accuracy :",
+            },
+        ),
+    )
+    evaluator.run(val_loader, max_epochs=1)
 
 if __name__ == "__main__":
     fire.Fire(main)
