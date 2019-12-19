@@ -137,7 +137,7 @@ class R2Plus1DClassifier(nn.Module):
         """
     def __init__(self, num_classes, layer_sizes, block_type=SpatioTemporalResBlock):
         super(R2Plus1DClassifier, self).__init__()
-
+        print("Original R2Plus1DClassifier")
         self.res2plus1d = R2Plus1DNet(layer_sizes, block_type)
         self.linear = nn.Linear(512, num_classes)
 

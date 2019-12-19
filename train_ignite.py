@@ -44,6 +44,7 @@ from ignite.utils import convert_tensor
 from toolz import compose, curry
 from torch.utils import data
 from models.cls_hrnet_2dplus1 import get_cls_net
+
 from ignite.contrib.handlers.param_scheduler import LRScheduler
 from dataset import get_dataset
 import torch.multiprocessing as mp

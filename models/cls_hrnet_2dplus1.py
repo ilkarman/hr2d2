@@ -23,12 +23,11 @@ import torch.nn as nn
 import torch._utils
 import torch.nn.functional as F
 
-from models.module import SpatioTemporalConv, SepSpatioTemporalConv
-from models.attention import SELayerCHW, SELayerTHW
+from models.module import SpatioTemporalConv
+from models.attention import SELayerTHW
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
-
 
 # Batchnorm
 BatchNorm = nn.BatchNorm3d
@@ -40,7 +39,6 @@ BatchNorm = nn.BatchNorm3d
 # bias=True, padding_mode='zeros')
 
 # Note that default is bias=True; in hrnet only head takes bias
-# Only blocks take block_conv3x3
 def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
     return nn.Conv3d(
@@ -50,9 +48,14 @@ def conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
 def block_conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
     """3x3 convolution with padding"""
     return nn.Conv3d(
-    #return SepSpatioTemporalConv(
         in_planes, out_planes, kernel_size=3, stride=stride,
         padding=padding, groups=in_planes, bias=bias)
+
+def bottleneck_conv3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
+    """3x3 convolution with padding"""
+    return SpatioTemporalConv(
+        in_planes, out_planes, kernel_size=3, stride=stride,
+        padding=padding, bias=bias)
 
 def conv1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
     """1x1 convolution with padding"""
@@ -108,7 +111,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = conv1x1(inplanes, planes, padding=0)
         self.bn1 = BatchNorm(planes, momentum=BN_MOMENTUM)
-        self.conv2 = block_conv3x3(planes, planes, stride=stride)
+        self.conv2 = bottleneck_conv3x3(planes, planes, stride=stride)
         self.bn2 = BatchNorm(planes, momentum=BN_MOMENTUM)
         self.conv3 = conv1x1(planes, planes * self.expansion, padding=0)
         self.bn3 = BatchNorm(planes * self.expansion, momentum=BN_MOMENTUM)
@@ -207,8 +210,9 @@ class HighResolutionModule(nn.Module):
             num_channels[branch_index] * block.expansion
         for i in range(1, num_blocks[branch_index]):
             # Add SE if last block
-            add_se = (i==(num_blocks[branch_index])-1)
-            #add_se = False
+            #add_se = (i==(num_blocks[branch_index])-1)
+            #add_se = True
+            add_se = (i+1)%2==0
             layers.append(block(self.num_inchannels[branch_index],
                                 num_channels[branch_index], 
                                 se=add_se,
@@ -252,14 +256,16 @@ class HighResolutionModule(nn.Module):
                         if k == i - j - 1:
                             num_outchannels_conv3x3 = num_inchannels[i]
                             conv3x3s.append(nn.Sequential(
-                                conv3x3(num_inchannels[j],
+                                # EDIT: downsample grouped
+                                block_conv3x3(num_inchannels[j],
                                         num_outchannels_conv3x3, stride=2),
                                 BatchNorm(num_outchannels_conv3x3, 
                                             momentum=BN_MOMENTUM)))
                         else:
                             num_outchannels_conv3x3 = num_inchannels[j]
                             conv3x3s.append(nn.Sequential(
-                                conv3x3(num_inchannels[j],
+                                # EDIT: downsample grouped
+                                block_conv3x3(num_inchannels[j],
                                         num_outchannels_conv3x3, stride=2),
                                 BatchNorm(num_outchannels_conv3x3,
                                             momentum=BN_MOMENTUM),
@@ -304,9 +310,10 @@ class HighResolutionNet(nn.Module):
         super(HighResolutionNet, self).__init__()
 
         # Stem
-        self.conv1 = conv3x3(3, 64, stride=2)
+        self.conv1 = bottleneck_conv3x3(3, 64, stride=2)
         self.bn1 = BatchNorm(64, momentum=BN_MOMENTUM)
-        
+        self.c_att1 = SELayerTHW(64, reduction=8)
+
         # Only one downsample in stem
         # Spatially 112 -> 56(enter stage1) -> 7(smallest res)
         #self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1,
@@ -453,8 +460,9 @@ class HighResolutionNet(nn.Module):
         inplanes = planes * block.expansion
         for i in range(1, blocks):
             # Add SE if last block
-            add_se = (i==(blocks-1))
-            #add_se = False
+            #add_se = (i==(blocks-1))
+            #add_se = True
+            add_se = (i+1)%2==0
             layers.append(block(inplanes, planes, se=add_se))
 
         return nn.Sequential(*layers)
@@ -495,6 +503,7 @@ class HighResolutionNet(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
+        x = self.c_att1(x)
         x = self.relu(x)
         x = self.layer1(x)
 
