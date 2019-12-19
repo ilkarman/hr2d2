@@ -8,7 +8,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 import torch
 from torchvision.datasets import VisionDataset
-
+import logging
 
 class VideoDataset(Dataset):
     r"""A Dataset for a folder of videos. Expects the directory structure to be
@@ -58,6 +58,8 @@ class VideoDataset(Dataset):
 
     def loadvideo(self, fname):
         # initialize a VideoCapture object to read video data into a numpy array
+        logger = logging.getLogger(__name__)
+        
         capture = cv2.VideoCapture(fname)
         frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -76,7 +78,7 @@ class VideoDataset(Dataset):
             # NOTE: strongly recommended to resize them during the download process. This script
             # will process videos of any size, but will take longer the larger the video file.
             if (frame_height != self.resize_height) or (frame_width != self.resize_width):
-                print("NOTE: Costly resizing {}, CHECK".format(fname))
+                logger.debug("NOTE: Costly resizing {}, CHECK".format(fname))
                 frame = cv2.resize(frame, (self.resize_width, self.resize_height))
             buffer[count] = frame
             count += 1

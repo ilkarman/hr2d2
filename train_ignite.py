@@ -43,7 +43,7 @@ from ignite.engine import Events
 from ignite.utils import convert_tensor
 from toolz import compose, curry
 from torch.utils import data
-from models.cls_hrnet_2dplus1 import get_cls_net
+from models import get_cls_net
 from ignite.contrib.handlers.param_scheduler import LRScheduler
 from dataset import get_dataset
 import torch.multiprocessing as mp
@@ -84,7 +84,6 @@ def main(node_rank, *options, dist_url="env://", cfg=None):
     update_config(config, options=options, config_file=cfg)
      # Start logging
     load_log_configuration(config.LOG_CONFIG)
-    print(__name__)
     logger = logging.getLogger(__name__)
     logger.debug(config.WORKERS)
 
@@ -183,7 +182,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
     model = get_cls_net(run_config).to(device)
 
     if distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[device], find_unused_parameters=True)
 
