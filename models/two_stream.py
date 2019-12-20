@@ -76,13 +76,14 @@ class TwoStream(nn.Module):
         super(TwoStream, self).__init__()
 
         self.inplanes = 64
+        self.temp_planes = 32
         self.temporal_expansion = 4
         # Input is (B, 3, 32, 128, 128)
         # STEM follows HRNet (conv2 no downsample)
         self.relu = nn.ReLU(inplace=True)
         
         self.conv1 = nn.Conv3d(3, self.inplanes, kernel_size=3, 
-            stride=2, padding=1, bias=False)
+            stride=(1,2,2), padding=1, bias=False)
         self.bn1 = nn.BatchNorm3d(self.inplanes, momentum=BN_MOMENTUM)
         self.conv2 = nn.Conv3d(self.inplanes, self.inplanes, kernel_size=3, 
             stride=1, padding=1, bias=False)
@@ -94,7 +95,7 @@ class TwoStream(nn.Module):
         # TemporalChannel -> Pool Channels to 1
         self.temp_conv1 = nn.Conv3d(64, 1, kernel_size=(1,1,1), padding=0)
         # SpatialChannel -> Pool Temporal to 1
-        self.spat_conv1 = nn.Conv3d(16, 1, kernel_size=(1,1,1), padding=0)
+        self.spat_conv1 = nn.Conv3d(self.temp_planes, 1, kernel_size=(1,1,1), padding=0)
         
         # Layer1
         _layer1_channels = 64
@@ -106,8 +107,8 @@ class TwoStream(nn.Module):
         self.temp_layer1_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer1_bn2 = nn.BatchNorm3d(1)
         # Fusion
-        self.temp_to_spat_layer1 = conv1x1(16, _layer1_channels)
-        self.spat_to_temp_layer1 = conv1x1(_layer1_channels, 16)
+        self.temp_to_spat_layer1 = conv1x1(self.temp_planes, _layer1_channels)
+        self.spat_to_temp_layer1 = conv1x1(_layer1_channels, self.temp_planes)
 
         # Layer2
         _layer2_channels = 128
@@ -119,8 +120,8 @@ class TwoStream(nn.Module):
         self.temp_layer2_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer2_bn2 = nn.BatchNorm3d(1)
         # Fusion
-        self.temp_to_spat_layer2 = conv1x1(16, _layer2_channels)
-        self.spat_to_temp_layer2 = conv1x1(_layer2_channels, 16)
+        self.temp_to_spat_layer2 = conv1x1(self.temp_planes, _layer2_channels)
+        self.spat_to_temp_layer2 = conv1x1(_layer2_channels, self.temp_planes)
 
         # Layer3
         _layer3_channels = 256
@@ -132,8 +133,8 @@ class TwoStream(nn.Module):
         self.temp_layer3_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer3_bn2 = nn.BatchNorm3d(1)
         # Fusion
-        self.temp_to_spat_layer3 = conv1x1(16, _layer3_channels)
-        self.spat_to_temp_layer3 = conv1x1(_layer3_channels, 16)
+        self.temp_to_spat_layer3 = conv1x1(self.temp_planes, _layer3_channels)
+        self.spat_to_temp_layer3 = conv1x1(_layer3_channels, self.temp_planes)
 
         # Layer4
         _layer4_channels = 512
@@ -145,11 +146,11 @@ class TwoStream(nn.Module):
         self.temp_layer4_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer4_bn2 = nn.BatchNorm3d(1)
         # Fusion
-        self.temp_to_spat_layer4 = conv1x1(16, _layer4_channels)
-        self.spat_to_temp_layer4 = conv1x1(_layer4_channels, 16)
+        self.temp_to_spat_layer4 = conv1x1(self.temp_planes, _layer4_channels)
+        self.spat_to_temp_layer4 = conv1x1(_layer4_channels, self.temp_planes)
 
         # Head
-        self.head_temp_conv1 = conv1x1(16, _layer4_channels)
+        self.head_temp_conv1 = conv1x1(self.temp_planes, _layer4_channels)
         self.head_avgpool = nn.AdaptiveAvgPool2d((1,1))
         self.head_fc = nn.Linear(512, num_classes)
 
@@ -197,8 +198,8 @@ class TwoStream(nn.Module):
             # Fusion
             temp_fusion = self.temp_to_spat_layer1(temp_x)
             spat_fusion = self.spat_to_temp_layer1(spat_x)
-            temp_x += spat_fusion
-            spat_x += temp_fusion
+            temp_x = temp_x + spat_fusion
+            spat_x = spat_x + temp_fusion
 
             # Layer2
             spat_x = self.spat_layer2(spat_x)
@@ -212,8 +213,8 @@ class TwoStream(nn.Module):
             # Fusion
             temp_fusion = self.temp_to_spat_layer2(temp_x)
             spat_fusion = self.spat_to_temp_layer2(spat_x)
-            temp_x += spat_fusion
-            spat_x += temp_fusion
+            temp_x = temp_x + spat_fusion
+            spat_x = spat_x + temp_fusion
     
             # Layer3
             spat_x = self.spat_layer3(spat_x)
@@ -227,8 +228,8 @@ class TwoStream(nn.Module):
             # Fusion
             temp_fusion = self.temp_to_spat_layer3(temp_x)
             spat_fusion = self.spat_to_temp_layer3(spat_x)
-            temp_x += spat_fusion
-            spat_x += temp_fusion
+            temp_x = temp_x + spat_fusion
+            spat_x = spat_x + temp_fusion
 
             # Layer4
             spat_x = self.spat_layer4(spat_x)
@@ -242,11 +243,11 @@ class TwoStream(nn.Module):
             # Fusion
             temp_fusion = self.temp_to_spat_layer4(temp_x)
             spat_fusion = self.spat_to_temp_layer4(spat_x)
-            temp_x += spat_fusion
-            spat_x += temp_fusion
+            temp_x = temp_x + spat_fusion
+            spat_x = spat_x + temp_fusion
 
             # HEAD
-            spat_x += self.head_temp_conv1(temp_x)
+            spat_x = spat_x + self.head_temp_conv1(temp_x)
             spat_x = self.head_avgpool(spat_x)
             return self.head_fc(torch.squeeze(spat_x))
 

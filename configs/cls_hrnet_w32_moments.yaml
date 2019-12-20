@@ -8,7 +8,7 @@ WORLD_SIZE: 8
 
 
 MODEL: 
-  NAME: 3d_cls_hrnet_w32
+  NAME: ilia_twostream
   EXTRA:
     STAGE1:
       NUM_MODULES: 1

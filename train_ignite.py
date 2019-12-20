@@ -43,7 +43,8 @@ from ignite.engine import Events
 from ignite.utils import convert_tensor
 from toolz import compose, curry
 from torch.utils import data
-from models.cls_hrnet_2dplus1 import get_cls_net
+#from models.cls_hrnet_2dplus1 import get_cls_net
+from models.two_stream import TwoStream
 
 from ignite.contrib.handlers.param_scheduler import LRScheduler
 from dataset import get_dataset
@@ -181,7 +182,8 @@ def run(local_process_id, node_rank, dist_url, run_config):
     else:
         logger.warning("Can not find GPUs!!!")
 
-    model = get_cls_net(run_config).to(device)
+    #model = get_cls_net(run_config).to(device)
+    model = TwoStream([3, 4, 6, 3]).to(device)
 
     if distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
