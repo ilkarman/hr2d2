@@ -252,6 +252,6 @@ class TwoStream(nn.Module):
 
 if __name__ == '__main__':
 
-    TwoStream18 = TwoStream([2,2,2,2])
+    TwoStream34 = TwoStream([3, 4, 6, 3])
     x = torch.randn((2, 3, 32, 128, 128))
-    print(TwoStream18(x).size())
+    print(TwoStream34(x).size())
