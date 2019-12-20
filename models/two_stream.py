@@ -71,6 +71,33 @@ class BasicBlock(nn.Module):
 
         return out
 
+
+class TempBasicBlock(nn.Module):
+    temporal_expansion = 4
+
+    def __init__(self, inplanes):
+        super(TempBasicBlock, self).__init__()
+        self.conv1 = conv3x1x1(inplanes, self.temporal_expansion)
+        self.bn1 = nn.BatchNorm3d(self.temporal_expansion, momentum=BN_MOMENTUM)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = conv3x1x1(self.temporal_expansion, 1)
+        self.bn2 = nn.BatchNorm3d(1, momentum=BN_MOMENTUM)
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        
+        out = self.conv2(out)
+        out = self.bn2(out)
+        
+        out += residual
+        out = self.relu(out)
+
+        return out
+
 class TwoStream(nn.Module):
     def __init__(self, layers, num_classes=39):
         super(TwoStream, self).__init__()
@@ -99,52 +126,33 @@ class TwoStream(nn.Module):
         
         # Layer1
         _layer1_channels = 64
-        # Spatial
         self.spat_layer1 = self._make_spat_layer(BasicBlock, _layer1_channels, layers[0])
-        # Temporal
-        self.temp_layer1_conv1 = conv3x1x1(1, self.temporal_expansion)
-        self.temp_layer1_bn1 = nn.BatchNorm3d(self.temporal_expansion)
-        self.temp_layer1_conv2 = conv3x1x1(self.temporal_expansion, 1)
-        self.temp_layer1_bn2 = nn.BatchNorm3d(1)
+        self.temp_layer1 = self._make_temp_layer(TempBasicBlock, layers[0])
         # Fusion
         self.temp_to_spat_layer1 = conv1x1(self.temp_planes, _layer1_channels)
         self.spat_to_temp_layer1 = conv1x1(_layer1_channels, self.temp_planes)
 
         # Layer2
         _layer2_channels = 128
-        # Spatial
         self.spat_layer2 = self._make_spat_layer(BasicBlock, _layer2_channels, layers[1], stride=2)
-        # Temporal
-        self.temp_layer2_conv1 = conv1x3x3(1, self.temporal_expansion, stride=2)  # Reduce spatially
-        self.temp_layer2_bn1 = nn.BatchNorm3d(self.temporal_expansion)
-        self.temp_layer2_conv2 = conv3x1x1(self.temporal_expansion, 1)
-        self.temp_layer2_bn2 = nn.BatchNorm3d(1)
+        self.temp_layer2 = self._make_temp_layer(TempBasicBlock, layers[1], downsample=True)
         # Fusion
         self.temp_to_spat_layer2 = conv1x1(self.temp_planes, _layer2_channels)
         self.spat_to_temp_layer2 = conv1x1(_layer2_channels, self.temp_planes)
 
         # Layer3
         _layer3_channels = 256
-        # Spatial
-        self.spat_layer3 = self._make_spat_layer(BasicBlock, _layer3_channels, layers[1], stride=2)
-        # Temporal
-        self.temp_layer3_conv1 = conv1x3x3(1, self.temporal_expansion, stride=2)  # Reduce spatially
-        self.temp_layer3_bn1 = nn.BatchNorm3d(self.temporal_expansion)
-        self.temp_layer3_conv2 = conv3x1x1(self.temporal_expansion, 1)
-        self.temp_layer3_bn2 = nn.BatchNorm3d(1)
+        self.spat_layer3 = self._make_spat_layer(BasicBlock, _layer3_channels, layers[2], stride=2)
+        self.temp_layer3 = self._make_temp_layer(TempBasicBlock, layers[2], downsample=True)
+
         # Fusion
         self.temp_to_spat_layer3 = conv1x1(self.temp_planes, _layer3_channels)
         self.spat_to_temp_layer3 = conv1x1(_layer3_channels, self.temp_planes)
 
         # Layer4
         _layer4_channels = 512
-        # Spatial
-        self.spat_layer4 = self._make_spat_layer(BasicBlock, _layer4_channels, layers[1], stride=2)
-        # Temporal
-        self.temp_layer4_conv1 = conv1x3x3(1, self.temporal_expansion, stride=2)  # Reduce spatially
-        self.temp_layer4_bn1 = nn.BatchNorm3d(self.temporal_expansion)
-        self.temp_layer4_conv2 = conv3x1x1(self.temporal_expansion, 1)
-        self.temp_layer4_bn2 = nn.BatchNorm3d(1)
+        self.spat_layer4 = self._make_spat_layer(BasicBlock, _layer4_channels, layers[3], stride=2)
+        self.temp_layer4 = self._make_temp_layer(TempBasicBlock, layers[3], downsample=True)
         # Fusion
         self.temp_to_spat_layer4 = conv1x1(self.temp_planes, _layer4_channels)
         self.spat_to_temp_layer4 = conv1x1(_layer4_channels, self.temp_planes)
@@ -171,6 +179,22 @@ class TwoStream(nn.Module):
         return nn.Sequential(*layers)
 
 
+    def _make_temp_layer(self, block, blocks, downsample=None, temporal_expansion=4):
+        layers = []
+        if downsample:
+            downsample = nn.Sequential(
+                    conv1x3x3(1, 1, stride=2),
+                    nn.BatchNorm3d(1),
+                    nn.ReLU(inplace=True)
+            )
+            layers.append(downsample)
+        for i in range(1, blocks):
+            inplanes = 1
+            layers.append(block(inplanes))
+
+        return nn.Sequential(*layers)
+
+
     def forward(self, x):
             # STEM
             x = self.conv1(x)
@@ -188,13 +212,8 @@ class TwoStream(nn.Module):
 
             # Layer1
             spat_x = self.spat_layer1(spat_x)
-            #temp_x.unsqueeze_(1)
-            temp_x = self.temp_layer1_conv1(temp_x)
-            temp_x = self.temp_layer1_bn1(temp_x)
-            temp_x = self.relu(temp_x)
-            temp_x = self.temp_layer1_conv2(temp_x)
-            temp_x = self.temp_layer1_bn2(temp_x)
-            temp_x = torch.squeeze(self.relu(temp_x))
+            temp_x = self.temp_layer1(temp_x)
+            temp_x = torch.squeeze(temp_x)
             # Fusion
             temp_fusion = self.temp_to_spat_layer1(temp_x)
             spat_fusion = self.spat_to_temp_layer1(spat_x)
@@ -204,12 +223,8 @@ class TwoStream(nn.Module):
             # Layer2
             spat_x = self.spat_layer2(spat_x)
             temp_x.unsqueeze_(1)
-            temp_x = self.temp_layer2_conv1(temp_x)
-            temp_x = self.temp_layer2_bn1(temp_x)
-            temp_x = self.relu(temp_x)
-            temp_x = self.temp_layer2_conv2(temp_x)
-            temp_x = self.temp_layer2_bn2(temp_x)
-            temp_x = torch.squeeze(self.relu(temp_x))
+            temp_x = self.temp_layer2(temp_x)
+            temp_x = torch.squeeze(temp_x)
             # Fusion
             temp_fusion = self.temp_to_spat_layer2(temp_x)
             spat_fusion = self.spat_to_temp_layer2(spat_x)
@@ -219,12 +234,8 @@ class TwoStream(nn.Module):
             # Layer3
             spat_x = self.spat_layer3(spat_x)
             temp_x.unsqueeze_(1)
-            temp_x = self.temp_layer3_conv1(temp_x)
-            temp_x = self.temp_layer3_bn1(temp_x)
-            temp_x = self.relu(temp_x)
-            temp_x = self.temp_layer3_conv2(temp_x)
-            temp_x = self.temp_layer3_bn2(temp_x)
-            temp_x = torch.squeeze(self.relu(temp_x))
+            temp_x = self.temp_layer3(temp_x)
+            temp_x = torch.squeeze(temp_x)
             # Fusion
             temp_fusion = self.temp_to_spat_layer3(temp_x)
             spat_fusion = self.spat_to_temp_layer3(spat_x)
@@ -234,12 +245,8 @@ class TwoStream(nn.Module):
             # Layer4
             spat_x = self.spat_layer4(spat_x)
             temp_x.unsqueeze_(1)
-            temp_x = self.temp_layer4_conv1(temp_x)
-            temp_x = self.temp_layer4_bn1(temp_x)
-            temp_x = self.relu(temp_x)
-            temp_x = self.temp_layer4_conv2(temp_x)
-            temp_x = self.temp_layer4_bn2(temp_x)
-            temp_x = torch.squeeze(self.relu(temp_x))
+            temp_x = self.temp_layer4(temp_x)
+            temp_x = torch.squeeze(temp_x)
             # Fusion
             temp_fusion = self.temp_to_spat_layer4(temp_x)
             spat_fusion = self.spat_to_temp_layer4(spat_x)
