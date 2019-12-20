@@ -76,6 +76,7 @@ class TwoStream(nn.Module):
         super(TwoStream, self).__init__()
 
         self.inplanes = 64
+        self.temporal_expansion = 16
         # Input is (B, 3, 32, 128, 128)
         # STEM follows HRNet (conv2 no downsample)
         self.relu = nn.ReLU(inplace=True)
@@ -100,9 +101,9 @@ class TwoStream(nn.Module):
         # Spatial
         self.spat_layer1 = self._make_spat_layer(BasicBlock, _layer1_channels, layers[0])
         # Temporal
-        self.temp_layer1_conv1 = conv3x1x1(1, 4)
-        self.temp_layer1_bn1 = nn.BatchNorm3d(4)
-        self.temp_layer1_conv2 = conv3x1x1(4, 1)
+        self.temp_layer1_conv1 = conv3x1x1(1, self.temporal_expansion)
+        self.temp_layer1_bn1 = nn.BatchNorm3d(self.temporal_expansion)
+        self.temp_layer1_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer1_bn2 = nn.BatchNorm3d(1)
         # Fusion
         self.temp_to_spat_layer1 = conv1x1(16, _layer1_channels)
@@ -113,9 +114,9 @@ class TwoStream(nn.Module):
         # Spatial
         self.spat_layer2 = self._make_spat_layer(BasicBlock, _layer2_channels, layers[1], stride=2)
         # Temporal
-        self.temp_layer2_conv1 = conv1x3x3(1, 4, stride=2)  # Reduce spatially
-        self.temp_layer2_bn1 = nn.BatchNorm3d(4)
-        self.temp_layer2_conv2 = conv3x1x1(4, 1)
+        self.temp_layer2_conv1 = conv1x3x3(1, self.temporal_expansion, stride=2)  # Reduce spatially
+        self.temp_layer2_bn1 = nn.BatchNorm3d(self.temporal_expansion)
+        self.temp_layer2_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer2_bn2 = nn.BatchNorm3d(1)
         # Fusion
         self.temp_to_spat_layer2 = conv1x1(16, _layer2_channels)
@@ -126,9 +127,9 @@ class TwoStream(nn.Module):
         # Spatial
         self.spat_layer3 = self._make_spat_layer(BasicBlock, _layer3_channels, layers[1], stride=2)
         # Temporal
-        self.temp_layer3_conv1 = conv1x3x3(1, 4, stride=2)  # Reduce spatially
-        self.temp_layer3_bn1 = nn.BatchNorm3d(4)
-        self.temp_layer3_conv2 = conv3x1x1(4, 1)
+        self.temp_layer3_conv1 = conv1x3x3(1, self.temporal_expansion, stride=2)  # Reduce spatially
+        self.temp_layer3_bn1 = nn.BatchNorm3d(self.temporal_expansion)
+        self.temp_layer3_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer3_bn2 = nn.BatchNorm3d(1)
         # Fusion
         self.temp_to_spat_layer3 = conv1x1(16, _layer3_channels)
@@ -139,9 +140,9 @@ class TwoStream(nn.Module):
         # Spatial
         self.spat_layer4 = self._make_spat_layer(BasicBlock, _layer4_channels, layers[1], stride=2)
         # Temporal
-        self.temp_layer4_conv1 = conv1x3x3(1, 4, stride=2)  # Reduce spatially
-        self.temp_layer4_bn1 = nn.BatchNorm3d(4)
-        self.temp_layer4_conv2 = conv3x1x1(4, 1)
+        self.temp_layer4_conv1 = conv1x3x3(1, self.temporal_expansion, stride=2)  # Reduce spatially
+        self.temp_layer4_bn1 = nn.BatchNorm3d(self.temporal_expansion)
+        self.temp_layer4_conv2 = conv3x1x1(self.temporal_expansion, 1)
         self.temp_layer4_bn2 = nn.BatchNorm3d(1)
         # Fusion
         self.temp_to_spat_layer4 = conv1x1(16, _layer4_channels)
