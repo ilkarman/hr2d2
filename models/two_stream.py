@@ -76,7 +76,7 @@ class TwoStream(nn.Module):
         super(TwoStream, self).__init__()
 
         self.inplanes = 64
-        self.temporal_expansion = 16
+        self.temporal_expansion = 4
         # Input is (B, 3, 32, 128, 128)
         # STEM follows HRNet (conv2 no downsample)
         self.relu = nn.ReLU(inplace=True)
