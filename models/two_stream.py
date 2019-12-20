@@ -30,6 +30,11 @@ def conv3x1x1(in_planes, out_planes, stride=1, padding=1, bias=False):
     return nn.Conv3d(in_planes, out_planes, kernel_size=[3,1,1], 
                     stride=[stride,1,1], padding=[padding,0,0], bias=bias)
 
+def conv1x3x3(in_planes, out_planes, stride=1, padding=1, bias=False):
+    """3x3 convolution with padding"""
+    return nn.Conv3d(in_planes, out_planes, kernel_size=[1,3,3], 
+                    stride=[1, stride, stride], padding=[0, padding, padding], bias=bias)
+
 def conv1x1(in_planes, out_planes, stride=1, bias=False):
     """1x1 convolution"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=bias)
@@ -91,21 +96,62 @@ class TwoStream(nn.Module):
         self.spat_conv1 = nn.Conv3d(16, 1, kernel_size=(1,1,1), padding=0)
         
         # Layer1
+        _layer1_channels = 64
         # Spatial
-        self.spat_layer1 = self._make_spat_layer(BasicBlock, 64, layers[0])
+        self.spat_layer1 = self._make_spat_layer(BasicBlock, _layer1_channels, layers[0])
         # Temporal
         self.temp_layer1_conv1 = conv3x1x1(1, 4)
         self.temp_layer1_bn1 = nn.BatchNorm3d(4)
         self.temp_layer1_conv2 = conv3x1x1(4, 1)
         self.temp_layer1_bn2 = nn.BatchNorm3d(1)
-        #  Fusion
-        self.temp_to_spat_layer1 = conv1x1(16, 64)
-        self.spat_to_temp_layer1 = conv1x1(64, 16)
+        # Fusion
+        self.temp_to_spat_layer1 = conv1x1(16, _layer1_channels)
+        self.spat_to_temp_layer1 = conv1x1(_layer1_channels, 16)
 
         # Layer2
+        _layer2_channels = 128
         # Spatial
-        self.spat_layer2 = self._make_spat_layer(BasicBlock, 128, layers[1], stride=2)
+        self.spat_layer2 = self._make_spat_layer(BasicBlock, _layer2_channels, layers[1], stride=2)
         # Temporal
+        self.temp_layer2_conv1 = conv1x3x3(1, 4, stride=2)  # Reduce spatially
+        self.temp_layer2_bn1 = nn.BatchNorm3d(4)
+        self.temp_layer2_conv2 = conv3x1x1(4, 1)
+        self.temp_layer2_bn2 = nn.BatchNorm3d(1)
+        # Fusion
+        self.temp_to_spat_layer2 = conv1x1(16, _layer2_channels)
+        self.spat_to_temp_layer2 = conv1x1(_layer2_channels, 16)
+
+        # Layer3
+        _layer3_channels = 256
+        # Spatial
+        self.spat_layer3 = self._make_spat_layer(BasicBlock, _layer3_channels, layers[1], stride=2)
+        # Temporal
+        self.temp_layer3_conv1 = conv1x3x3(1, 4, stride=2)  # Reduce spatially
+        self.temp_layer3_bn1 = nn.BatchNorm3d(4)
+        self.temp_layer3_conv2 = conv3x1x1(4, 1)
+        self.temp_layer3_bn2 = nn.BatchNorm3d(1)
+        # Fusion
+        self.temp_to_spat_layer3 = conv1x1(16, _layer3_channels)
+        self.spat_to_temp_layer3 = conv1x1(_layer3_channels, 16)
+
+        # Layer4
+        _layer4_channels = 512
+        # Spatial
+        self.spat_layer4 = self._make_spat_layer(BasicBlock, _layer4_channels, layers[1], stride=2)
+        # Temporal
+        self.temp_layer4_conv1 = conv1x3x3(1, 4, stride=2)  # Reduce spatially
+        self.temp_layer4_bn1 = nn.BatchNorm3d(4)
+        self.temp_layer4_conv2 = conv3x1x1(4, 1)
+        self.temp_layer4_bn2 = nn.BatchNorm3d(1)
+        # Fusion
+        self.temp_to_spat_layer4 = conv1x1(16, _layer4_channels)
+        self.spat_to_temp_layer4 = conv1x1(_layer4_channels, 16)
+
+        # Head
+        self.head_temp_conv1 = conv1x1(16, _layer4_channels)
+        self.head_avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.head_fc = nn.Linear(512, num_classes)
+
 
     def _make_spat_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -139,16 +185,14 @@ class TwoStream(nn.Module):
             temp_x = self.temp_conv1(x)
 
             # Layer1
-            # torch.Size([2, 64, 64, 64])
             spat_x = self.spat_layer1(spat_x)
-            #Spatial Layer 1:  torch.Size([2, 64, 64, 64])
+            #temp_x.unsqueeze_(1)
             temp_x = self.temp_layer1_conv1(temp_x)
             temp_x = self.temp_layer1_bn1(temp_x)
             temp_x = self.relu(temp_x)
             temp_x = self.temp_layer1_conv2(temp_x)
             temp_x = self.temp_layer1_bn2(temp_x)
             temp_x = torch.squeeze(self.relu(temp_x))
-            #Temporal Layer 1:  torch.Size([2, 16, 64, 64])
             # Fusion
             temp_fusion = self.temp_to_spat_layer1(temp_x)
             spat_fusion = self.spat_to_temp_layer1(spat_x)
@@ -157,10 +201,57 @@ class TwoStream(nn.Module):
 
             # Layer2
             spat_x = self.spat_layer2(spat_x)
-            # torch.Size([2, 128, 32, 32])
+            temp_x.unsqueeze_(1)
+            temp_x = self.temp_layer2_conv1(temp_x)
+            temp_x = self.temp_layer2_bn1(temp_x)
+            temp_x = self.relu(temp_x)
+            temp_x = self.temp_layer2_conv2(temp_x)
+            temp_x = self.temp_layer2_bn2(temp_x)
+            temp_x = torch.squeeze(self.relu(temp_x))
+            # Fusion
+            temp_fusion = self.temp_to_spat_layer2(temp_x)
+            spat_fusion = self.spat_to_temp_layer2(spat_x)
+            temp_x += spat_fusion
+            spat_x += temp_fusion
+    
+            # Layer3
+            spat_x = self.spat_layer3(spat_x)
+            temp_x.unsqueeze_(1)
+            temp_x = self.temp_layer3_conv1(temp_x)
+            temp_x = self.temp_layer3_bn1(temp_x)
+            temp_x = self.relu(temp_x)
+            temp_x = self.temp_layer3_conv2(temp_x)
+            temp_x = self.temp_layer3_bn2(temp_x)
+            temp_x = torch.squeeze(self.relu(temp_x))
+            # Fusion
+            temp_fusion = self.temp_to_spat_layer3(temp_x)
+            spat_fusion = self.spat_to_temp_layer3(spat_x)
+            temp_x += spat_fusion
+            spat_x += temp_fusion
+
+            # Layer4
+            spat_x = self.spat_layer4(spat_x)
+            temp_x.unsqueeze_(1)
+            temp_x = self.temp_layer4_conv1(temp_x)
+            temp_x = self.temp_layer4_bn1(temp_x)
+            temp_x = self.relu(temp_x)
+            temp_x = self.temp_layer4_conv2(temp_x)
+            temp_x = self.temp_layer4_bn2(temp_x)
+            temp_x = torch.squeeze(self.relu(temp_x))
+            # Fusion
+            temp_fusion = self.temp_to_spat_layer4(temp_x)
+            spat_fusion = self.spat_to_temp_layer4(spat_x)
+            temp_x += spat_fusion
+            spat_x += temp_fusion
+
+            # HEAD
+            spat_x += self.head_temp_conv1(temp_x)
+            spat_x = self.head_avgpool(spat_x)
+            return self.head_fc(torch.squeeze(spat_x))
+
 
 if __name__ == '__main__':
 
     TwoStream18 = TwoStream([2,2,2,2])
     x = torch.randn((2, 3, 32, 128, 128))
-    TwoStream18(x)
+    print(TwoStream18(x).size())
