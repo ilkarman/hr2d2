@@ -33,3 +33,7 @@ dependencies:
     - scipy
     - jupytext
     - moviepy  # To visualise videos
+    - auzreml-sdk
+    - python-dotenv
+    - knack
+    - azure-cli-core
