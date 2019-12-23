@@ -1,6 +1,3 @@
-
-import models.cls_hrnet_3d
-import models.cls_hrnet_2dplus1
+import models.cls_hrnet
 import models.r2plus1d
 import models.two_stream
-# import models.cls_hrnet_2dplus1_se

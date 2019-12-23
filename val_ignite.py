@@ -43,14 +43,13 @@ from ignite.engine import Events
 from ignite.utils import convert_tensor
 from toolz import compose, curry
 from torch.utils import data
-from models.cls_hrnet_2dplus1 import get_cls_net
+from models.cls_hrnet import get_cls_net
 from ignite.contrib.handlers.param_scheduler import LRScheduler
 from dataset import get_dataset
 import torch.multiprocessing as mp
 from cv_lib.event_handlers.logging_handlers import Evaluator
 from cv_lib.event_handlers.tensorboard_handlers import create_summary_writer
 from cv_lib import extract_metric_from
-
 
 def prepare_batch(batch, device=None, non_blocking=False):
     x, y = batch
@@ -129,6 +128,18 @@ def run(local_process_id, node_rank, dist_url, run_config):
         torch.cuda.manual_seed_all(run_config.SEED)
     np.random.seed(seed=run_config.SEED)
    
+    # Augmentations
+    val_aug = Compose(
+        [
+            PadIfNeeded(
+                min_height=max(run_config.TEST.RESIZE_H_W),
+                min_width=max(run_config.TEST.RESIZE_H_W),
+                always_apply=True,
+                mask_value=0,
+            ),
+        ]
+    )
+
     # Dataloaders
     n_classes = run_config.DATASET.N_CLASSES
 
@@ -137,8 +148,9 @@ def run(local_process_id, node_rank, dist_url, run_config):
         mode=run_config.DATASET.TEST_SET,
         clip_len=run_config.TEST.CLIP_LEN,  # 32
         resize_h_w=run_config.TEST.RESIZE_H_W,  # (128,170)
-        crop_size=run_config.TEST.CROP_SIZE,  # 128
-        num_classes=n_classes)
+        crop_spatial=False,  # Don't crop 128,128 from 128,170s
+        augmentations=val_aug
+    )
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=rank)
     val_loader = data.DataLoader(
@@ -158,18 +170,18 @@ def run(local_process_id, node_rank, dist_url, run_config):
     else:
         logger.warning("Can not find GPUs!!!")
 
-    print('NOT LOADING MODEL PROPERLY FROM IGNITE SNAPSHOT?')
-    STOP
-
+ 
     # Load model from file
     model = get_cls_net(run_config)
-    model.load_state_dict(torch.load(run_config.TEST.MODEL_PATH))
     model = model.to(device)
 
     if distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[device], find_unused_parameters=True)
+
+    model.load_state_dict(torch.load(run_config.TEST.MODEL_PATH))
+
 
     if silence_other_ranks & rank != 0:
         logging.getLogger("ignite.engine.engine.Engine").setLevel(logging.WARNING)

@@ -88,6 +88,7 @@ DATASET:
 
 TEST:
   MODEL_FILE: ''
+  MODEL_PATH: '/home/iliauk/notebooks/hr2d2/output/ilia/pipeline/4e2d1d9a7af52549af501a8d84cc62ea636c97e7/ilia_twostream/Dec20_231056/model/ilia_twostream_snapshot13del_1.pth'
   BATCH_SIZE_PER_GPU: 8
   NUM_WORKERS: 4
   CLIP_LEN: 32

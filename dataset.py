@@ -23,13 +23,15 @@ class VideoDataset(Dataset):
         """
 
     def __init__(self, directory, mode='train', clip_len=32, 
-                resize_h_w=(128,170), crop_size=128, **kwargs):
+                resize_h_w=(128,170), crop_size=128, crop_spatial=True, augmentations=None, **kwargs):
         folder = Path(directory)/mode  # get the directory of the specified split
 
         self.clip_len = clip_len
-        self.resize_height, self.resize_width = resize_h_w  
         self.crop_size = crop_size
-        self.crop_spatial = True  # Fix, for validation
+        self.crop_spatial = crop_spatial  # Fix, for validation
+        self.resize_height, self.resize_width = resize_h_w  
+        self.longest_side = max(resize_h_w)
+        self.augmentations = augmentations
 
         # obtain all the filenames of files inside all the class folders 
         # going through each class folder one at a time
@@ -63,7 +65,10 @@ class VideoDataset(Dataset):
         frame_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         # create a buffer. Must have dtype float, so it gets converted to a FloatTensor by Pytorch later
-        buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
+        if self.crop_spatial:
+            buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
+        else:
+            buffer = np.empty((frame_count, self.longest_side, self.longest_side, 3), np.dtype('float32'))
 
         count = 0
         retaining = True
@@ -78,6 +83,9 @@ class VideoDataset(Dataset):
             if (frame_height != self.resize_height) or (frame_width != self.resize_width):
                 print("NOTE: Costly resizing {}, CHECK".format(fname))
                 frame = cv2.resize(frame, (self.resize_width, self.resize_height))
+            if self.augmentations:
+                augmented_dict = self.augmentations(image=frame)
+                frame = augmented_dict["image"]
             buffer[count] = frame
             count += 1
 
