@@ -23,15 +23,14 @@ class VideoDataset(Dataset):
         """
 
     def __init__(self, directory, mode='train', clip_len=32, 
-                resize_h_w=(128,170), crop_size=128, crop_spatial=True, augmentations=None, **kwargs):
+                resize_h_w=(128,170), crop_size=128, centre_crop=False, **kwargs):
         folder = Path(directory)/mode  # get the directory of the specified split
+
 
         self.clip_len = clip_len
         self.crop_size = crop_size
-        self.crop_spatial = crop_spatial  # Fix, for validation
         self.resize_height, self.resize_width = resize_h_w  
-        self.longest_side = max(resize_h_w)
-        self.augmentations = augmentations
+        self.centre_crop = centre_crop
 
         # obtain all the filenames of files inside all the class folders 
         # going through each class folder one at a time
@@ -65,11 +64,7 @@ class VideoDataset(Dataset):
         frame_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         # create a buffer. Must have dtype float, so it gets converted to a FloatTensor by Pytorch later
-        if self.crop_spatial:
-            buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
-        else:
-            buffer = np.empty((frame_count, self.longest_side, self.longest_side, 3), np.dtype('float32'))
-
+        buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
         count = 0
         retaining = True
 
@@ -83,9 +78,6 @@ class VideoDataset(Dataset):
             if (frame_height != self.resize_height) or (frame_width != self.resize_width):
                 print("NOTE: Costly resizing {}, CHECK".format(fname))
                 frame = cv2.resize(frame, (self.resize_width, self.resize_height))
-            if self.augmentations:
-                augmented_dict = self.augmentations(image=frame)
-                frame = augmented_dict["image"]
             buffer[count] = frame
             count += 1
 
@@ -106,7 +98,8 @@ class VideoDataset(Dataset):
         # crop and jitter the video using indexing. The spatial crop is performed on 
         # the entire array, so each frame is cropped in the same location. The temporal
         # jitter takes place via the selection of consecutive frames
-        if self.crop_spatial:
+        if not self.centre_crop:
+            # Random crops horizontally
             height_index = np.random.randint(buffer.shape[2] - crop_size + 1)
             width_index = np.random.randint(buffer.shape[3] - crop_size + 1)
             buffer = buffer[
@@ -116,7 +109,15 @@ class VideoDataset(Dataset):
                 width_index:width_index + crop_size
             ]
         else:
-            buffer = buffer[:,time_index:time_index + clip_len,:,:]
+            # Centre crop
+            width_diff = (buffer.shape[3]-crop_size)/2  # 21
+            height_diff = (buffer.shape[2]-crop_size)/2  # 0
+            buffer = buffer[
+                :,
+                time_index:time_index + clip_len,
+                height_diff:height_diff + crop_size,
+                width_diff:width_diff + crop_size
+            ]        
         return buffer                
 
     def normalize(self, buffer):

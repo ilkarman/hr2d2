@@ -128,18 +128,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
         torch.cuda.manual_seed_all(run_config.SEED)
     np.random.seed(seed=run_config.SEED)
    
-    # Augmentations
-    val_aug = Compose(
-        [
-            PadIfNeeded(
-                min_height=max(run_config.TEST.RESIZE_H_W),
-                min_width=max(run_config.TEST.RESIZE_H_W),
-                always_apply=True,
-                mask_value=0,
-            ),
-        ]
-    )
-
+ 
     # Dataloaders
     n_classes = run_config.DATASET.N_CLASSES
 
@@ -148,8 +137,7 @@ def run(local_process_id, node_rank, dist_url, run_config):
         mode=run_config.DATASET.TEST_SET,
         clip_len=run_config.TEST.CLIP_LEN,  # 32
         resize_h_w=run_config.TEST.RESIZE_H_W,  # (128,170)
-        crop_spatial=False,  # Don't crop 128,128 from 128,170s
-        augmentations=val_aug
+        centre_crop=True
     )
     val_sampler = torch.utils.data.distributed.DistributedSampler(
         val_set, num_replicas=world_size, rank=rank)
