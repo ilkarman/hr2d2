@@ -110,8 +110,9 @@ class VideoDataset(Dataset):
             ]
         else:
             # Centre crop
-            width_diff = (buffer.shape[3]-crop_size)/2  # 21
-            height_diff = (buffer.shape[2]-crop_size)/2  # 0
+            width_diff = int((buffer.shape[3]-crop_size)/2)  # 21
+            height_diff = int((buffer.shape[2]-crop_size)/2)  # 0
+
             buffer = buffer[
                 :,
                 time_index:time_index + clip_len,
