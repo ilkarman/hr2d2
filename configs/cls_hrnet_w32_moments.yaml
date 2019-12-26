@@ -81,33 +81,33 @@ CUDNN:
 DATASET:
   DATASET: 'moments'
   DATA_FORMAT: 'avi'
-  ROOT: '/datasets/Moments_in_Time_Small'
+  ROOT: '/datasets/Moments_in_Time_Medium'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
-  N_CLASSES: 39
+  N_CLASSES: 339
 
 TEST:
   MODEL_FILE: ''
   MODEL_PATH: '/home/iliauk/notebooks/hr2d2/output/ilia/pipeline/4e2d1d9a7af52549af501a8d84cc62ea636c97e7/ilia_twostream/Dec20_231056/model/ilia_twostream_snapshot13del_1.pth'
-  BATCH_SIZE_PER_GPU: 8
+  BATCH_SIZE_PER_GPU: 4
   NUM_WORKERS: 4
   CLIP_LEN: 32
-  RESIZE_H_W: (128, 170)
-  CROP_SIZE: 128
+  RESIZE_H_W: (256, 340)
+  CROP_SIZE: 256
 
 TRAIN:
-  BATCH_SIZE_PER_GPU: 4
+  BATCH_SIZE_PER_GPU: 1
   NUM_WORKERS: 4
   BEGIN_EPOCH: 0
   END_EPOCH: 100
   RESUME: true
   CLIP_LEN: 32
-  RESIZE_H_W: (128, 170)
-  CROP_SIZE: 128
+  RESIZE_H_W: (256, 340)
+  CROP_SIZE: 256
   OPTIMIZER: sgd
-  LR: 0.03
-  LR_STEP_SIZE: 15
-  LR_FACTOR: 0.5
+  LR: 0.01  
+  LR_STEP_SIZE: 10
+  LR_FACTOR: 0.1
   MODEL_DIR: "model"
   
 DEBUG:

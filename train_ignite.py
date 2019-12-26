@@ -47,6 +47,8 @@ from models.cls_hrnet import get_cls_net
 #from models.two_stream import TwoStream
 
 from ignite.contrib.handlers.param_scheduler import LRScheduler
+from ignite.contrib.handlers import CosineAnnealingScheduler
+
 from dataset import get_dataset
 import torch.multiprocessing as mp
 from cv_lib.event_handlers.logging_handlers import Evaluator
@@ -193,20 +195,28 @@ def run(local_process_id, node_rank, dist_url, run_config):
     # Loss and Schedule
     criterion = nn.CrossEntropyLoss() # standard crossentropy loss for classification
     # FLAG TEMP
-    #optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
-    optimizer = optim.Adam(model.parameters())
-    step_scheduler = optim.lr_scheduler.StepLR(
-        optimizer, 
-        step_size=run_config.TRAIN.LR_STEP_SIZE, 
-        gamma=run_config.TRAIN.LR_FACTOR  # the scheduler divides the lr by 10 every 10 epochs
-    )  
-    scheduler = LRScheduler(step_scheduler)
+    optimizer = optim.SGD(model.parameters(), lr=run_config.TRAIN.LR)  # hyperparameters as given in paper sec 4.1
+    # 2+1 Paper: The initial learning rate is set to 0.01 and divided by 10 every 10 epochs
+    # CSN Paper: Training is done in 45 epochs where we use model warming-up [14] in the first 10 epochs
+    #and the remaining 35 epochs will follow the half-cosine period learning rate schedule as in [10]. The initial learning
+    #rate is set to 0.01 per GPU (equivalent to 0.64 for 64 GPUs). [ 8 clips per GPU]
+    # So if CSN then we need 0.08/8 = 0.01 LR
+    # If 2+1 we need 0.04 = 0.025
+    # Use 0.01 and do cosine annealing
+    #step_scheduler = optim.lr_scheduler.StepLR(
+    #    optimizer, 
+    #    step_size=run_config.TRAIN.LR_STEP_SIZE, 
+    #    gamma=run_config.TRAIN.LR_FACTOR  # the scheduler divides the lr by 10 every 10 epochs
+    #)  
+    #scheduler = LRScheduler(step_scheduler)
+    snapshot_duration = 45 * len(train_loader)
+    scheduler = CosineAnnealingScheduler(optimizer, "lr", config.TRAIN.LR, 0.001, snapshot_duration)
 
     # Setting up trainer
     trainer = create_supervised_trainer(model, optimizer, criterion, prepare_batch, device=device)
 
     # FLAG TEMP
-    #trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
+    trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
     # Set to update the epoch parameter of our distributed data sampler so that we get
     # different shuffles
     trainer.add_event_handler(Events.EPOCH_STARTED, update_sampler_epoch(train_loader))
