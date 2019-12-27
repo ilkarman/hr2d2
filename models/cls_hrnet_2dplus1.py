@@ -257,7 +257,7 @@ class HighResolutionModule(nn.Module):
                             num_outchannels_conv3x3 = num_inchannels[i]
                             conv3x3s.append(nn.Sequential(
                                 # EDIT: downsample grouped
-                                block_conv3x3(num_inchannels[j],
+                                conv3x3(num_inchannels[j],
                                         num_outchannels_conv3x3, stride=2),
                                 BatchNorm(num_outchannels_conv3x3, 
                                             momentum=BN_MOMENTUM)))
@@ -265,7 +265,7 @@ class HighResolutionModule(nn.Module):
                             num_outchannels_conv3x3 = num_inchannels[j]
                             conv3x3s.append(nn.Sequential(
                                 # EDIT: downsample grouped
-                                block_conv3x3(num_inchannels[j],
+                                conv3x3(num_inchannels[j],
                                         num_outchannels_conv3x3, stride=2),
                                 BatchNorm(num_outchannels_conv3x3,
                                             momentum=BN_MOMENTUM),
